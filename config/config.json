@@ -2,5 +2,9 @@
 	"username": "xE96693@co.abg.com",
 	"password": "Eds12345!",
 	"login_id": "E96693",
-	"delay_seconds": 9
+	"delay_seconds": 9,
+      "logging": {
+    "level": "INFO",
+    "format": "[%(levelname)s] [mc.automation] [%(asctime)s] %(message)s"
+  }
 }

@@ -53,6 +53,14 @@ def test_mva_complaints_tab():
 
         field.clear()
         field.send_keys(mva)
+        # Check if MVA is valid before proceeding with work items
+
+        time.sleep(5)
+
+        from utils.ui_helpers import is_mva_known
+        if not is_mva_known(driver, mva):
+            log.warning(f"[MVA] {mva} — invalid/unknown MVA, skipping")
+            continue
 
         # Handle PM Work Items in one call
         from flows.work_item_flow import handle_pm_workitems

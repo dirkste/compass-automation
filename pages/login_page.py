@@ -129,17 +129,6 @@ class LoginPage:
         password_field.send_keys(password)
         log.info(f"[LOGIN] Password entered")
 
-        pw_next_btn = safe_wait(
-            self.driver,
-            5,
-            EC.element_to_be_clickable((By.ID, "idSIButton9")),
-            "password_next_button",
-        )
-
-        log.info(f"[DEBUG] pw_next_btn: {pw_next_btn}")
-        if not pw_next_btn:
-            log.warning(f"[LOGIN] Next button not found after password")
-            return {"status": "failed", "reason": "timeout_password_next"}
         log.info("[LOGIN] Clicking Sign in after password")
         if not click_element(self.driver, (By.ID, "idSIButton9"), desc="Sign in button"):
             return {"status": "failed", "reason": "click_password_next"}

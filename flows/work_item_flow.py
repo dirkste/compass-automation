@@ -23,7 +23,6 @@ def get_work_items(driver, mva: str):
         log.info(f"[WORKITEMS] {mva} - collected {len(tiles)} open PM item(s)")
         for t in tiles:
             log.debug(f"[DBG] {mva} - tile text = {t.text!r}")
-        input("Press Enter to continue...")  # debug pause
         return tiles
     except NoSuchElementException as e:
         log.warning(f"[WORKITEM][WARN] {mva} - could not collect work items -> {e}")
@@ -192,18 +191,24 @@ def complete_work_item_dialog(driver, note: str = "Done", timeout: int = 10, obs
         complete_btn = safe_wait(
             driver,
             timeout,
-            EC.element_to_be_clickable((By.XPATH, ".//button[normalize-space()='Complete Work Item']")),
+            EC.element_to_be_clickable((By.XPATH, "//div[contains(@class,'bp6-dialog')]//button[normalize-space()='Complete Work Item']")),
             desc="Complete Work Item button"
         )
         time.sleep(5)
 
         complete_btn.click()
         log.info("[DIALOG] 'Complete Work Item' button clicked")
+    
 
         # 4) Wait for dialog to close
-        safe_wait(driver ,timeout, EC.invisibility_of_element(dialog), desc="Dialog to close")
+        safe_wait(driver ,timeout, EC.invisibility_of_element(dialog), desc="Dialog to close")    
 
         log.info("[DIALOG] Correction dialog closed")
+
+        # The issue might be that closing the UI short after clicking the button 
+        # doesn't give enough time for the backend to process the completion.
+        # Adding a longer wait here to ensure the process completes before proceeding.
+        time.sleep(30)
 
         return {"status": "ok"}
     except Exception as e:
