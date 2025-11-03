@@ -22,7 +22,7 @@ class MVAInputPage:
         """Return the active MVA input field by probing multiple locators."""
         for locator in self.CANDIDATES:
             try:
-                return find_element(self.driver, locator, timeout=4)
+                return find_element(self.driver, locator, timeout=10)
             except Exception:
                 continue
 

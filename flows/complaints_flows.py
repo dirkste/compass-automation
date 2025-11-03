@@ -93,7 +93,7 @@ def detect_existing_complaints(driver, mva: str):
 
         return valid_tiles
     except Exception as e:
-        log.error(f"[COMPLAINT][ERROR] {mva} — complaint detection failed → {e}")
+        log.error(f"[COMPLAINT][ERROR] {mva} — complaint detection failed -> {e}")
         return []
 
 def find_pm_tiles(driver, mva: str):
@@ -117,13 +117,14 @@ def find_pm_tiles(driver, mva: str):
 def associate_existing_complaint(driver, mva: str) -> dict:
     """
     Look for existing PM complaints and associate them.
-    Flow: select complaint tile → Next (complaint) → Next (mileage) → Opcode (PM Gas) → Finalize Work Item.
+    Flow: select complaint tile -> Next (complaint) -> Next (mileage) -> Opcode (PM Gas) -> Finalize Work Item.
     """
     try:
+        time.sleep(5)  # wait for tiles to load
         tiles = driver.find_elements(
             By.XPATH, "//div[contains(@class,'fleet-operations-pwa__complaintItem__')]"
         )
-        time.sleep(3)  # wait for tiles to load
+        time.sleep(1)  # wait for tiles to load
         if not tiles:
             log.info(f"[COMPLAINT][EXISTING] {mva} - no complaint tiles found")
             return {"status": "skipped_no_complaint", "mva": mva}
@@ -144,20 +145,20 @@ def associate_existing_complaint(driver, mva: str) -> dict:
             tile.click()
             log.info(f"[COMPLAINT][ASSOCIATED] {mva} - complaint '{tile.text.strip()}' selected")
         except Exception as e:
-            log.warning(f"[COMPLAINT][WARN] {mva} - failed to click complaint tile → {e}")
+            log.warning(f"[COMPLAINT][WARN] {mva} - failed to click complaint tile -> {e}")
             return {"status": "failed", "reason": "tile_click", "mva": mva}
 
-        # Step 1: Complaint → Next
+        # Step 1: Complaint -> Next
         from utils.ui_helpers import click_next_in_dialog
         if not click_next_in_dialog(driver, timeout=8):
             return {"status": "failed", "reason": "complaint_next", "mva": mva}
 
-        # Step 2: Mileage → Next
+        # Step 2: Mileage -> Next
         res = complete_mileage_dialog(driver, mva)
         if res.get("status") != "ok":
             return {"status": "failed", "reason": "mileage", "mva": mva}
 
-        # Step 3: Opcode → PM Gas
+        # Step 3: Opcode -> PM Gas
         res = select_opcode(driver, mva, code_text="PM Gas")
         if res.get("status") != "ok":
             return {"status": "failed", "reason": "opcode", "mva": mva}
@@ -165,7 +166,7 @@ def associate_existing_complaint(driver, mva: str) -> dict:
         return {"status": "associated", "mva": mva}
 
     except Exception as e:
-        log.warning(f"[COMPLAINT][WARN] {mva} - complaint association failed → {e}")
+        log.warning(f"[COMPLAINT][WARN] {mva} - complaint association failed -> {e}")
         return {"status": "failed", "reason": "exception", "mva": mva}
 
 def create_new_complaint(driver, mva: str) -> dict:
@@ -240,5 +241,5 @@ def click_next_in_dialog(driver, timeout: int = 10) -> bool:
         return True
 
     except Exception as e:
-        log.warning(f"[DIALOG][WARN] could not click Next button → {e}")
+        log.warning(f"[DIALOG][WARN] could not click Next button -> {e}")
         return False

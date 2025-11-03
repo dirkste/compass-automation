@@ -157,7 +157,7 @@ def open_pm_workitem_card(driver, mva: str, timeout: int = 8) -> dict:
         log.warning(f"[WORKITEM][WARN] {mva} - could not open Open PM Work Item card -> {e}")
         return {"status": "failed", "reason": "open_pm_card", "mva": mva}
 
-def complete_work_item_dialog(driver, note: str = "Done", timeout: int = 10, observe: int = 0) -> dict:
+def complete_work_item_dialog(driver, note: str = "Done", timeout: int = 10) -> dict:
     """Fill the correction dialog with note and click 'Complete Work Item'."""
     try:
         # 1) Wait for visible dialog root
@@ -224,7 +224,7 @@ def mark_complete_pm_workitem(driver, mva: str, note: str = "Done", timeout: int
             return {"status": "failed", "reason": "mark_complete_button", "mva": mva}
 
     time.sleep(0.2)
-    res = complete_work_item_dialog(driver, note=note, timeout=max(10, timeout), observe=1)
+    res = complete_work_item_dialog(driver, note=note, timeout=max(10, timeout))
     log.info(f"[MARKCOMPLETE] complete_work_item_dialog -> {res}")
 
     if res and res.get("status") == "ok":

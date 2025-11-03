@@ -50,19 +50,19 @@ class AdditionalInfoPage(BasePage):
         """Later: wait until S.DIALOG is visible."""
         pass
 
-    def set_text(self, label_text: str, value: str) -> None:
-        """
-        Stub: find a text field by its label and type value.
-        Example: set_text('Notes', 'Customer reported vibration at idle.')
-        """
-        pass
+    # def set_text(self, label_text: str, value: str) -> None:
+    #     """
+    #     Stub: find a text field by its label and type value.
+    #     Example: set_text('Notes', 'Customer reported vibration at idle.')
+    #     """
+    #     pass
 
-    def set_toggle(self, label_text: str, on: bool) -> None:
-        """
-        Stub: find a toggle/checkbox by its label and set True/False.
-        Example: set_toggle('Requires Tow', False)
-        """
-        pass
+    # def set_toggle(self, label_text: str, on: bool) -> None:
+    #     """
+    #     Stub: find a toggle/checkbox by its label and set True/False.
+    #     Example: set_toggle('Requires Tow', False)
+    #     """
+    #     pass
 
     def click_next(self) -> None:
         """Stub: advance to the Mileage step."""

@@ -42,6 +42,6 @@ def finalize_workitem(driver, mva: str) -> dict:
         return {"status": "closed", "mva": mva}
 
     except Exception as e:
-        log.error(f"[WORKITEM][ERROR] {mva} - finalize_workitem exception → {e}")
+        log.error(f"[WORKITEM][ERROR] {mva} - finalize_workitem exception -> {e}")
         navigate_back_to_home(driver)
         return {"status": "failed", "reason": "exception", "mva": mva}
