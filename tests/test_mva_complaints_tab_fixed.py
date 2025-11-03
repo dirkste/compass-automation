@@ -4,7 +4,6 @@ import pytest
 from selenium.webdriver.common.by import By
 from config.config_loader import get_config
 from core import driver_manager
-from flows.work_item_flow import process_workitem
 from pages.login_page import LoginPage
 from pages.mva_input_page import MVAInputPage
 from utils.data_loader import load_mvas
@@ -30,7 +29,7 @@ def test_mva_complaints_tab():
     login_page = LoginPage(driver)
     res = login_page.ensure_ready(USERNAME, PASSWORD, LOGIN_ID)
     if res["status"] != "ok":
-        pytest.skip(f"Login failed → {res}")
+        pytest.skip(f"Login failed -> {res}")
     time.sleep(DELAY)  # configurable settle
 
     # Load MVAs from CSV
@@ -43,7 +42,7 @@ def test_mva_complaints_tab():
         log.info(f">>> Starting MVA {mva}")
         log.info("=" * 80)
 
-              # Enter the MVA into the input field
+        # Enter the MVA into the input field
         mva_page = MVAInputPage(driver)
         field = mva_page.find_input()
         if not field:
@@ -57,10 +56,16 @@ def test_mva_complaints_tab():
 
         time.sleep(5)
 
-        from utils.ui_helpers import is_mva_known
+        from utils.ui_helpers import is_mva_known, get_lighthouse_status
         if not is_mva_known(driver, mva):
             log.warning(f"[MVA] {mva} — invalid/unknown MVA, skipping")
             continue
+
+        # Check Lighthouse status for early exit
+        # lighthouse_status = get_ lighthouse_status(driver, mva)
+        # if lighthouse_status == "Rentable":
+        #     log.info(f"[MVA] {mva} — Lighthouse status is 'Rentable', skipping further processing.")
+        #     continue
 
         # Handle PM Work Items in one call
         from flows.work_item_flow import handle_pm_workitems
@@ -75,8 +80,6 @@ def test_mva_complaints_tab():
         else:
             log.warning(f"[WORKITEM] {mva} — failed flow: {res}")
 
+        navigate_back_to_home(driver)
         continue
     print("[FIXTURE] All tests complete - quitting singleton driver...")
-
-
-

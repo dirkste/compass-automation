@@ -1,7 +1,7 @@
 ﻿# utils/ui_helpers.py
 import os
 import time
-from config.config_loader import DEFAULT_TIMEOUT
+from typing import Optional
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -104,7 +104,7 @@ def send_text(
         typed_value = element.get_attribute("value")
         if typed_value != text:
             log.warning(
-                f"[SENDTEXT] {label or locator} mismatch → expected '{text}', got '{typed_value}'"
+                f"[SENDTEXT] {label or locator} mismatch -> expected '{text}', got '{typed_value}'"
             )
             return False
 
@@ -261,19 +261,96 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
 def is_mva_known(driver, mva: str, timeout: int = 8) -> bool:
+
     """Return True if vehicle-properties-container loads, else False (unknown MVA)."""
+
     log.info(f"[MVA] {mva} — checking if vehicle loads...")
+
     try:
+
         WebDriverWait(driver, timeout).until(
+
             EC.presence_of_element_located(
+
                 (By.CSS_SELECTOR, "div.fleet-operations-pwa__vehicle-properties-container__tniqjm")
+
             )
+
         )
+
         log.debug(f"[MVA] {mva} — vehicle properties container detected")
+
         return True
+
     except TimeoutException:
+
         log.warning(f"[MVA][WARN] {mva} — vehicle properties container not found (likely unknown MVA)")
+
         return False
+
+
+
+
+
+def get_lighthouse_status(driver, mva: str, timeout: int = 8) -> Optional[str]:
+
+    """
+
+    Extracts the 'Lighthouse' status from the vehicle properties container.
+
+    Assumes the structure is a label div followed by a value div.
+
+    """
+
+    log.info(f"[MVA] {mva} — attempting to extract Lighthouse status...")
+
+    try:
+
+        # Locate the vehicle properties container
+
+        container = WebDriverWait(driver, timeout).until(
+
+            EC.presence_of_element_located(
+
+                (By.CSS_SELECTOR, "div.fleet-operations-pwa__vehicle-properties-container__tniqjm")
+
+            )
+
+        )
+
+
+
+        # Within the container, find the 'Lighthouse' label and its corresponding value
+
+        lighthouse_label_xpath = ".//div[contains(@class,'vehicle-property-name')][normalize-space()='Lighthouse']"
+
+        lighthouse_value_xpath = f"{lighthouse_label_xpath}/following-sibling::div[contains(@class,'vehicle-property-value')]"
+
+
+
+        lighthouse_value_element = WebDriverWait(container, timeout).until(
+
+            EC.presence_of_element_located((By.XPATH, lighthouse_value_xpath))
+
+        )
+
+        status = lighthouse_value_element.text.strip()
+
+        log.info(f"[MVA] {mva} — Lighthouse status: {status}")
+
+        return status
+
+    except TimeoutException:
+
+        log.warning(f"[MVA][WARN] {mva} — Lighthouse status element not found within timeout.")
+
+        return None
+
+    except Exception as e:
+
+        log.error(f"[MVA][ERROR] {mva} — Failed to extract Lighthouse status: {e}")
+
+        return None
 
 
 
@@ -312,7 +389,7 @@ def click_element(driver, locator: tuple, desc: str = "element", timeout: int = 
             log.debug(f"[CLICK] clicked {locator} ({desc})")
             return True
         except StaleElementReferenceException:
-            log.warning(f"[CLICK][WARN] stale element → retrying {locator} ({desc})")
+            log.warning(f"[CLICK][WARN] stale element -> retrying {locator} ({desc})")
             el = WebDriverWait(driver, timeout).until(
                 EC.element_to_be_clickable(locator)
             )
@@ -610,28 +687,28 @@ def click_done(driver, timeout: int = 8) -> bool:
 
 
 
-def navigate_back_to_home(driver, max_clicks: int = 3) -> bool:
+def navigate_back_to_home(driver, max_clicks: int = 5) -> bool:
     """Click the back arrow until the home screen (camera button visible) is reached."""
     for i in range(max_clicks):
-        # 1) Check if camera button exists (home screen)
-        if driver.find_elements(By.XPATH, "//button[contains(@class,'fleet-operations-pwa__camera-button')]"):
-            log.info("[NAV] back at MVA input screen (camera button visible)")
-            return True
+        try:
+            if driver.find_elements(By.XPATH, "//button[contains(@class,'fleet-operations-pwa__camera-button')]"):
+                log.info("[NAV] back at MVA input screen (camera button visible)")
+                return True
+        except StaleElementReferenceException:
+            pass # Element is stale, try again
 
-        # 2) Try clicking back arrow
-        arrows = driver.find_elements(By.XPATH, "//button[contains(@class,'fleet-operations-pwa__back-button')]")
-        if arrows:
-            try:
-                time.sleep(3)  # brief pause before clicking
+        try:
+            arrows = driver.find_elements(By.XPATH, "//button[contains(@class,'fleet-operations-pwa__back-button')]")
+            if arrows:
                 arrows[0].click()
                 log.info(f"[NAV] back arrow clicked ({i+1}/{max_clicks})")
                 time.sleep(1.5)  # settle
-            except Exception as e:
-                log.warning(f"[NAV][WARN] could not click back arrow -> {e}")
-                return False
-        else:
-            log.info("[NAV] no back arrow visible")
-            break
+            else:
+                log.info("[NAV] no back arrow visible")
+                break
+        except Exception as e:
+            log.warning(f"[NAV][WARN] could not click back arrow -> {e}")
+            return False
 
     log.warning("[NAV][FAIL] did not return to home screen (camera button not found)")
     return False

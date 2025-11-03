@@ -3,7 +3,7 @@ import time
 import pytest
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys  # ✅ add this import at the top
+
 from selenium.webdriver.support import expected_conditions as EC
 
 
@@ -67,7 +67,7 @@ class LoginPage:
             ):
                 return {"status": "failed", "reason": "wwid_entry_failed"}
 
-            # Press Enter (special key → keep raw)
+            # Press Enter (special key -> keep raw)
             self.driver.find_element(
                 By.CSS_SELECTOR, "input[class*='fleet-operations-pwa__text-input__']"
             )
@@ -84,7 +84,7 @@ class LoginPage:
             return {"status": "failed", "reason": "exception"}
 
     def login(self, username: str, password: str, login_id: str):
-        """Perform login flow: email → password → stay signed in"""
+        """Perform login flow: email -> password -> stay signed in"""
         # Navigation via Navigator (SRP)
         
         log.info(f"[DEBUG] inside login()")
@@ -229,7 +229,7 @@ class LoginPage:
         log.info(f"[DEBUG] before ensure_logged_in")
 
         res = self.ensure_logged_in(username, password, login_id)
-        log.debug(f"[LOGIN] ensure_logged_in → {res}")
+        log.debug(f"[LOGIN] ensure_logged_in -> {res}")
         time.sleep(self.delay_seconds)
         if res["status"] != "ok":
             return res
