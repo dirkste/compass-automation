@@ -10,7 +10,7 @@ class Navigator:
 
     def go_to(self, url: str, label: str = "page", verify: bool = True):
         """Navigate to a URL. Optionally call verify afterwards."""
-        log.info(f"[NAV] Navigating to {label} -> {url}")
+        log.info(f"[NAV] Navigating to {label} → {url}")
         self.driver.get(url)
 
         if verify:

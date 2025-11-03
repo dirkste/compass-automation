@@ -48,7 +48,7 @@ def get_driver_version(driver_path: str) -> str:
         output = subprocess.check_output([driver_path, "--version"], text=True)
         return re.search(r"(\d+\.\d+\.\d+\.\d+)", output).group(1)
     except Exception as e:
-        log.error(f"[DRIVER] Failed to get driver version from {driver_path} -> {e}")
+        log.error(f"[DRIVER] Failed to get driver version from {driver_path} → {e}")
         return "unknown"
 
 
@@ -67,11 +67,11 @@ def get_or_create_driver():
 
     # Compare before launching browser
     if browser_ver.split(".")[0] != driver_ver.split(".")[0]:
-        log.error(f"[DRIVER] Version mismatch -> Browser {browser_ver}, Driver {driver_ver}")
+        log.error(f"[DRIVER] Version mismatch → Browser {browser_ver}, Driver {driver_ver}")
         raise RuntimeError("Edge/Driver version mismatch")
 
     try:
-        log.info(f"[DRIVER] Launching Edge -> Browser {browser_ver}, Driver {driver_ver}")
+        log.info(f"[DRIVER] Launching Edge → Browser {browser_ver}, Driver {driver_ver}")
         options = webdriver.EdgeOptions()
         options.add_argument("--inprivate")
         options.add_argument("--start-maximized")
