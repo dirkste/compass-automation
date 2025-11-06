@@ -58,9 +58,8 @@ def get_or_create_driver():
     if _driver:
         return _driver
 
-    driver_path = r"C:\temp\Python\msedgedriver.exe"
     browser_ver = get_browser_version()
-    driver_ver = get_driver_version(driver_path)
+    driver_ver = get_driver_version(DRIVER_PATH)
 
     # Always log detected versions
     log.info(f"[DRIVER] Detected Browser={browser_ver}, Driver={driver_ver}")
@@ -77,7 +76,7 @@ def get_or_create_driver():
         options.add_argument("--start-maximized")
         options.add_experimental_option("prefs", {
             "profile.default_content_setting_values.geolocation": 2 }) 
-        service = Service(r"C:\temp\Python\msedgedriver.exe")
+        service = Service(DRIVER_PATH)
         _driver = webdriver.Edge(service=service, options=options)
          #_driver = webdriver.Edge(driver_path, options=options)
         return _driver
