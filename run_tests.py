@@ -30,7 +30,8 @@ def main():
         "test_unit_fast.py",
         "test_edge_cases.py", 
         "test_smoke.py",
-        "test_integration.py"
+        "test_integration.py",
+        "test_integration_extended.py"
     ]
     
     if quiet_mode:
