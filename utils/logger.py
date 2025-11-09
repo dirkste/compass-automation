@@ -33,3 +33,10 @@ if not log.handlers:
     )
     handler.setFormatter(formatter)
     log.addHandler(handler)
+
+    # Add a file handler to write logs to a file
+    file_handler = logging.FileHandler('automation.log', encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
+    file_formatter = logging.Formatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
+    file_handler.setFormatter(file_formatter)
+    log.addHandler(file_handler)
