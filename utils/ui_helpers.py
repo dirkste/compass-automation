@@ -1,4 +1,4 @@
-﻿# utils/ui_helpers.py
+# utils/ui_helpers.py
 import os
 import time
 from typing import Optional
