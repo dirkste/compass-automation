@@ -17,15 +17,29 @@ except json.JSONDecodeError as e:
 
 def get_config(key: str, default: Any = None) -> Any:
     """
-    Retrieve a config value by key.
+    Retrieve a config value by key, supporting dot notation for nested keys.
 
     Args:
-        key: The key to look up in config.json
+        key: The key to look up in config.json (supports dot notation like "logging.level")
         default: Optional fallback if key is missing
 
     Returns:
         The value from config.json or the default if provided.
     """
+    # Handle nested keys with dot notation
+    if '.' in key:
+        keys = key.split('.')
+        value = _CONFIG
+        try:
+            for k in keys:
+                value = value[k]
+            return value
+        except (KeyError, TypeError):
+            if default is None:
+                raise KeyError(f"[CONFIG] Missing nested key: '{key}' in {CONFIG_PATH}")
+            return default
+    
+    # Handle simple keys
     if key not in _CONFIG and default is None:
         raise KeyError(f"[CONFIG] Missing key: '{key}' in {CONFIG_PATH}")
     return _CONFIG.get(key, default)

@@ -15,7 +15,7 @@ def main():
     quiet_mode = "--quiet" in sys.argv
     
     if not quiet_mode:
-        print("🧪 Running Compass Automation Unit Tests...")
+        print("[TEST] Running Compass Automation Unit Tests...")
         print("=" * 50)
     
     # Change to tests directory (relative to this script)
@@ -52,21 +52,21 @@ def main():
         # Summary
         if result.returncode == 0:
             if quiet_mode:
-                print(f"✅ Tests passed ({elapsed:.2f}s)")
+                print(f"[PASS] Tests passed ({elapsed:.2f}s)")
             else:
-                print(f"✅ All tests passed in {elapsed:.2f} seconds!")
+                print(f"[PASS] All tests passed in {elapsed:.2f} seconds!")
         else:
             if quiet_mode:
-                print("❌ Tests failed")
+                print("[FAIL] Tests failed")
                 print(result.stdout)  # Show failures even in quiet mode
             else:
-                print(f"❌ Some tests failed (exit code: {result.returncode})")
+                print(f"[FAIL] Some tests failed (exit code: {result.returncode})")
                 print("Run with pytest directly for more details.")
         
         return result.returncode
         
     except Exception as e:
-        print(f"❌ Failed to run tests: {e}")
+        print(f"[ERROR] Failed to run tests: {e}")
         return 1
 
 
