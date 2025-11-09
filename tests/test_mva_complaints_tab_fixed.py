@@ -10,6 +10,7 @@ from utils.data_loader import load_mvas
 from utils.logger import log
 from utils.project_paths import ProjectPaths
 from utils.ui_helpers import navigate_back_to_home, is_mva_known
+from utils.test_validation import TestDataValidator
 
 # Load config values
 USERNAME = get_config("username")
@@ -33,9 +34,12 @@ def test_mva_complaints_tab():
         pytest.skip(f"Login failed -> {res}")
     time.sleep(DELAY)  # configurable settle
 
-    # Load MVAs from CSV
-    mvas = load_mvas(str(ProjectPaths.get_data_path("mva.csv")))
-    assert mvas, "Expected at least one MVA in CSV"
+    # Load and validate test data - CRITICAL: This ensures E2E actually runs
+    mvas = TestDataValidator.validate_or_skip_e2e_test()
+    log.info(f"[E2E] Validated test data: {len(mvas)} MVAs to process")
+    
+    # Store expected MVAs for post-test validation
+    expected_mvas = set(mvas)
 
     # Loop through MVAs
     for mva in mvas:
@@ -80,7 +84,14 @@ def test_mva_complaints_tab():
             time.sleep(5)
         else:
             log.warning(f"[WORKITEM] {mva} — failed flow: {res}")
-
-        navigate_back_to_home(driver)
-        continue
-    print("[FIXTURE] All tests complete - quitting singleton driver...")
+    
+    # CRITICAL POST-TEST VALIDATION: Ensure all test MVAs were actually processed
+    log.info("[E2E] Starting post-test validation to verify MVA processing...")
+    try:
+        validation_result = TestDataValidator.validate_e2e_execution(require_all_mvas=True)
+        log.info(f"[E2E] ✅ VALIDATION SUCCESS: {validation_result['processed_count']}/{validation_result['expected_count']} MVAs processed")
+    except Exception as e:
+        log.error(f"[E2E] ❌ VALIDATION FAILED: {str(e)}")
+        pytest.fail(f"E2E Validation Failed: {str(e)}")
+    
+    log.info("[E2E] Test completed - all MVAs processed and validated")
