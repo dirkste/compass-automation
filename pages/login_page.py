@@ -8,6 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 from core.navigator import Navigator
+from utils.project_paths import ProjectPaths
 from utils.logger import log
 from utils.ui_helpers import click_element, safe_wait, send_text
 
@@ -16,8 +17,8 @@ class LoginPage:
     def __init__(self, driver):
         self.driver = driver
 
-        # Hardcoded config path
-        config_path = r"C:\temp\Python\config\config.json"
+        # Use centralized path management
+        config_path = ProjectPaths.get_config_path()
         with open(config_path, "r") as f:
             config = json.load(f)
             self.delay_seconds = config.get("delay_seconds", 4)

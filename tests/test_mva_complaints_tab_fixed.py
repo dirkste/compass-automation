@@ -8,6 +8,7 @@ from pages.login_page import LoginPage
 from pages.mva_input_page import MVAInputPage
 from utils.data_loader import load_mvas
 from utils.logger import log
+from utils.project_paths import ProjectPaths
 from utils.ui_helpers import navigate_back_to_home, is_mva_known
 
 # Load config values
@@ -33,7 +34,7 @@ def test_mva_complaints_tab():
     time.sleep(DELAY)  # configurable settle
 
     # Load MVAs from CSV
-    mvas = load_mvas(r"C:\temp\Python\data\mva.csv")
+    mvas = load_mvas(str(ProjectPaths.get_data_path("mva.csv")))
     assert mvas, "Expected at least one MVA in CSV"
 
     # Loop through MVAs
