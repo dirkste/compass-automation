@@ -114,59 +114,108 @@ def find_pm_tiles(driver, mva: str):
         log.info(f"[COMPLAINT] {mva} — no PM complaint tiles found ({e})")
         return []
 
-def associate_existing_complaint(driver, mva: str) -> dict:
+# Extracted methods for associate_existing_complaint refactoring
+def _find_pm_complaint_tiles(driver, mva: str):
     """
-    Look for existing PM complaints and associate them.
-    Flow: select complaint tile → Next (complaint) → Next (mileage) → Opcode (PM Gas) → Finalize Work Item.
+    Find and filter PM complaint tiles from the UI.
+    Returns tuple: (all_tiles, pm_tiles, status_dict_or_None)
     """
     try:
         tiles = driver.find_elements(
             By.XPATH, "//div[contains(@class,'fleet-operations-pwa__complaintItem__')]"
         )
         time.sleep(3)  # wait for tiles to load
+        
         if not tiles:
             log.info(f"[COMPLAINT][EXISTING] {mva} - no complaint tiles found")
-            return {"status": "skipped_no_complaint", "mva": mva}
+            return None, None, {"status": "skipped_no_complaint", "mva": mva}
 
         # Filter PM complaints only
         pm_tiles = [t for t in tiles if any(label in t.text for label in ["PM", "PM Hard Hold - PM"])]
         if not pm_tiles:
             log.info(f"[COMPLAINT][EXISTING] {mva} - no PM complaints found")
-            return {"status": "skipped_no_complaint", "mva": mva}
+            return tiles, None, {"status": "skipped_no_complaint", "mva": mva}
 
-        if not pm_tiles:
-            log.info(f"[COMPLAINT][EXISTING] {mva} - no PM complaints found")
-            return {"status": "no_pm", "mva": mva}
+        return tiles, pm_tiles, None
+        
+    except Exception as e:
+        log.warning(f"[COMPLAINT][WARN] {mva} - failed to find complaint tiles → {e}")
+        return None, None, {"status": "failed", "reason": "tile_search", "mva": mva}
 
-        # Click first matching PM complaint
+def _select_complaint_tile(tile, mva: str):
+    """
+    Select a specific complaint tile with error handling.
+    Returns dict with status or None for success.
+    """
+    try:
+        tile.click()
+        log.info(f"[COMPLAINT][ASSOCIATED] {mva} - complaint '{tile.text.strip()}' selected")
+        return None  # Success
+    except Exception as e:
+        log.warning(f"[COMPLAINT][WARN] {mva} - failed to click complaint tile → {e}")
+        return {"status": "failed", "reason": "tile_click", "mva": mva}
+
+def _execute_complaint_dialog_step(driver, mva: str):
+    """Execute Step 1: Complaint → Next dialog navigation."""
+    from utils.ui_helpers import click_next_in_dialog
+    if not click_next_in_dialog(driver, timeout=8):
+        return {"status": "failed", "reason": "complaint_next", "mva": mva}
+    return None  # Success
+
+def _execute_mileage_dialog_step(driver, mva: str):
+    """Execute Step 2: Mileage → Next dialog handling."""
+    res = complete_mileage_dialog(driver, mva)
+    if res.get("status") != "ok":
+        return {"status": "failed", "reason": "mileage", "mva": mva}
+    return None  # Success
+
+def _execute_opcode_dialog_step(driver, mva: str):
+    """Execute Step 3: Opcode → PM Gas selection."""
+    res = select_opcode(driver, mva, code_text="PM Gas")
+    if res.get("status") != "ok":
+        return {"status": "failed", "reason": "opcode", "mva": mva}
+    return None  # Success
+
+def _create_failure_result(reason: str, mva: str, exception_msg: str = None):
+    """Create standardized failure result dictionary."""
+    if exception_msg:
+        log.warning(f"[COMPLAINT][WARN] {mva} - complaint association failed → {exception_msg}")
+    return {"status": "failed", "reason": reason, "mva": mva}
+
+def associate_existing_complaint(driver, mva: str) -> dict:
+    """
+    Look for existing PM complaints and associate them using extracted workflow steps.
+    Flow: select complaint tile → Next (complaint) → Next (mileage) → Opcode (PM Gas) → Finalize Work Item.
+    """
+    try:
+        # Phase 1: Find and filter PM complaint tiles
+        tiles, pm_tiles, early_return = _find_pm_complaint_tiles(driver, mva)
+        if early_return:
+            return early_return
+            
+        # Phase 2: Select first PM complaint tile
         tile = pm_tiles[0]
-        try:
-            tile.click()
-            log.info(f"[COMPLAINT][ASSOCIATED] {mva} - complaint '{tile.text.strip()}' selected")
-        except Exception as e:
-            log.warning(f"[COMPLAINT][WARN] {mva} - failed to click complaint tile → {e}")
-            return {"status": "failed", "reason": "tile_click", "mva": mva}
-
-        # Step 1: Complaint → Next
-        from utils.ui_helpers import click_next_in_dialog
-        if not click_next_in_dialog(driver, timeout=8):
-            return {"status": "failed", "reason": "complaint_next", "mva": mva}
-
-        # Step 2: Mileage → Next
-        res = complete_mileage_dialog(driver, mva)
-        if res.get("status") != "ok":
-            return {"status": "failed", "reason": "mileage", "mva": mva}
-
-        # Step 3: Opcode → PM Gas
-        res = select_opcode(driver, mva, code_text="PM Gas")
-        if res.get("status") != "ok":
-            return {"status": "failed", "reason": "opcode", "mva": mva}
-
+        selection_error = _select_complaint_tile(tile, mva)
+        if selection_error:
+            return selection_error
+            
+        # Phase 3: Execute dialog workflow steps
+        workflow_steps = [
+            lambda: _execute_complaint_dialog_step(driver, mva),
+            lambda: _execute_mileage_dialog_step(driver, mva), 
+            lambda: _execute_opcode_dialog_step(driver, mva)
+        ]
+        
+        for step_func in workflow_steps:
+            step_error = step_func()
+            if step_error:
+                return step_error
+        
+        # Success case
         return {"status": "associated", "mva": mva}
 
     except Exception as e:
-        log.warning(f"[COMPLAINT][WARN] {mva} - complaint association failed → {e}")
-        return {"status": "failed", "reason": "exception", "mva": mva}
+        return _create_failure_result("exception", mva, str(e))
 
 def create_new_complaint(driver, mva: str) -> dict:
     """Create a new complaint when no suitable PM complaint exists."""

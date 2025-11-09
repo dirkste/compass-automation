@@ -18,9 +18,9 @@ def generate_evaluation_checklist(branch_name, target_branch="main"):
     """Generate a new evaluation checklist from template."""
     
     # Read the template
-    template_path = Path("EVALUATION_CHECKLIST_TEMPLATE.md")
+    template_path = Path("markdown/EVALUATION_CHECKLIST_TEMPLATE.md")
     if not template_path.exists():
-        print("❌ Template file not found: EVALUATION_CHECKLIST_TEMPLATE.md")
+        print("❌ Template file not found: markdown/EVALUATION_CHECKLIST_TEMPLATE.md")
         return False
     
     with open(template_path, 'r', encoding='utf-8') as f:
@@ -63,7 +63,7 @@ def generate_evaluation_checklist(branch_name, target_branch="main"):
     
     print(f"✅ Evaluation checklist generated: {eval_file}")
     print(f"📋 Please complete all sections before making integration recommendations")
-    print(f"📖 Reference: CODE_EVALUATION_STANDARDS.md for detailed criteria")
+    print(f"📖 Reference: markdown/CODE_EVALUATION_STANDARDS.md for detailed criteria")
     
     return True
 

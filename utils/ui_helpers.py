@@ -516,97 +516,134 @@ def find_element(driver, locator, timeout=10):
 # Overrides for: click_next_in_dialog, click_done, process_pm_workitem_flow
 # ==========================
 
+# Extracted helper functions for click_next_in_dialog refactoring
+def _find_next_button_candidates(driver):
+    """Find all possible 'Next' button candidates using multiple strategies."""
+    # 1) Exact class from your snippet
+    cs = driver.find_elements(
+        By.CSS_SELECTOR, "button.fleet-operations-pwa__nextButton__153vo4c"
+    )
+    # 2) Button with a <p> 'Next' inside (your DOM shape)
+    x1 = driver.find_elements(By.XPATH, "//button[.//p[normalize-space()='Next']]")
+    # 3) Any role=button with that inner <p> text (fallback)
+    x2 = driver.find_elements(
+        By.XPATH, "//*[@role='button' and .//p[normalize-space()='Next']]"
+    )
+    # 4) Last resort: visible text 'Next' on/inside a button-ish thing
+    x3 = driver.find_elements(
+        By.XPATH,
+        "//*[self::button or @role='button'][.//span or .//p][.//p[normalize-space()='Next'] or normalize-space()='Next']",
+    )
+    return cs + x1 + x2 + x3
 
-def click_next_in_dialog(driver, timeout: int = 10) -> bool:
-    """
-    Find and click the PM wizard 'Next' button.
-    Matches your HTML exactly and no longer requires the bp6-dialog ancestor.
-    """
-
-    def _cands():
-        # 1) Exact class from your snippet
-        cs = driver.find_elements(
-            By.CSS_SELECTOR, "button.fleet-operations-pwa__nextButton__153vo4c"
-        )
-        # 2) Button with a <p> 'Next' inside (your DOM shape)
-        x1 = driver.find_elements(By.XPATH, "//button[.//p[normalize-space()='Next']]")
-        # 3) Any role=button with that inner <p> text (fallback)
-        x2 = driver.find_elements(
-            By.XPATH, "//*[@role='button' and .//p[normalize-space()='Next']]"
-        )
-        # 4) Last resort: visible text 'Next' on/inside a button-ish thing
-        x3 = driver.find_elements(
-            By.XPATH,
-            "//*[self::button or @role='button'][.//span or .//p][.//p[normalize-space()='Next'] or normalize-space()='Next']",
-        )
-        seen = set()
-        out = []
-        for el in cs + x1 + x2 + x3:
-            try:
-                if not el.is_displayed():
-                    continue
-                # de-dupe by id()
-                oid = el.id if hasattr(el, "id") else el
-                if oid in seen:
-                    continue
-                seen.add(oid)
-                out.append(el)
-            except Exception:
-                continue
-        time.sleep(10)
-        return out
-
-    def _enabled(el):
+def _deduplicate_elements(elements):
+    """Remove duplicate elements from the list."""
+    seen = set()
+    out = []
+    for el in elements:
         try:
-            if not el.is_enabled():
-                return False
-            aria = el.get_attribute("aria-disabled")
-            if str(aria).lower() in ("true", "1"):
-                return False
-            clz = (el.get_attribute("class") or "").lower()
-            if "disabled" in clz:
-                return False
+            if not el.is_displayed():
+                continue
+            # de-dupe by id()
+            oid = el.id if hasattr(el, "id") else el
+            if oid in seen:
+                continue
+            seen.add(oid)
+            out.append(el)
+        except Exception:
+            continue
+    time.sleep(10)
+    return out
+
+def _is_element_enabled(el):
+    """Check if element is enabled and not disabled via aria or class."""
+    try:
+        if not el.is_enabled():
+            return False
+        aria = el.get_attribute("aria-disabled")
+        if str(aria).lower() in ("true", "1"):
+            return False
+        clz = (el.get_attribute("class") or "").lower()
+        if "disabled" in clz:
+            return False
+        return True
+    except Exception:
+        return False
+
+def _get_best_candidate(candidates):
+    """Get the first enabled candidate from the list."""
+    return next((c for c in candidates if _is_element_enabled(c)), None)
+
+def _scroll_element_into_view(driver, element):
+    """Scroll element into view safely."""
+    try:
+        driver.execute_script(
+            "arguments[0].scrollIntoView({block:'center'});", element
+        )
+    except Exception:
+        pass
+
+def _click_element_safely(driver, element):
+    """Click element with fallback to JavaScript execution."""
+    try:
+        element.click()
+        return True
+    except Exception:
+        try:
+            driver.execute_script("arguments[0].click();", element)
             return True
         except Exception:
             return False
 
+def _log_candidates_debug_info(candidates):
+    """Log debug information about all candidates."""
+    for i, c in enumerate(candidates, 1):
+        try:
+            txt = (c.text or c.get_attribute("textContent") or "").strip()
+            clz = c.get_attribute("class") or ""
+            aria = c.get_attribute("aria-disabled")
+            log.info(
+                f"[NEXT][CAND] #{i} text='{txt}' enabled={c.is_enabled()} aria-disabled={aria} class='{clz}'"
+            )
+        except Exception:
+            pass
+
+def click_next_in_dialog(driver, timeout: int = 10) -> bool:
+    """
+    Find and click the PM wizard 'Next' button using extracted helper methods.
+    Matches your HTML exactly and no longer requires the bp6-dialog ancestor.
+    """
     # Wait until at least one candidate is present and enabled
     end = time.time() + timeout
     print("[NEXT][SCAN] searching for Next buttonâ€¦")
+    
     while time.time() < end:
-        cands = _cands()
-        if cands:
-            for i, c in enumerate(cands, 1):
-                try:
-                    txt = (c.text or c.get_attribute("textContent") or "").strip()
-                    clz = c.get_attribute("class") or ""
-                    aria = c.get_attribute("aria-disabled")
-                    log.info(
-                        "[NEXT][CAND] #{i} text='{txt}' enabled={c.is_enabled()} aria-disabled={aria} class='{clz}'"
-                    )
-                except Exception:
-                    pass
-
-            btn = next((c for c in cands if _enabled(c)), None)
-            if btn:
-                try:
-                    driver.execute_script(
-                        "arguments[0].scrollIntoView({block:'center'});", btn
-                    )
-                except Exception:
-                    pass
-                try:
-                    btn.click()
-                except Exception:
-                    driver.execute_script("arguments[0].click();", btn)
-                print("[NEXT] Clicked Next.")
-                time.sleep(0.3)
-                return True
+        # Phase 1: Find and deduplicate candidates
+        raw_candidates = _find_next_button_candidates(driver)
+        candidates = _deduplicate_elements(raw_candidates)
+        
+        if candidates:
+            # Phase 2: Log debug information
+            _log_candidates_debug_info(candidates)
+            
+            # Phase 3: Find best enabled candidate
+            best_button = _get_best_candidate(candidates)
+            
+            if best_button:
+                # Phase 4: Execute click operation
+                _scroll_element_into_view(driver, best_button)
+                
+                if _click_element_safely(driver, best_button):
+                    print("[NEXT] Clicked Next.")
+                    time.sleep(0.3)
+                    return True
+        
         time.sleep(0.2)
 
-    # One last dump before failing
-    cands = _cands()
-    log.error(f"[NEXT][ERROR] No enabled Next button found. candidates={len(cands)}")
+    # Final failure case - one last dump before failing
+    final_candidates = _find_next_button_candidates(driver)
+    final_deduplicated = _deduplicate_elements(final_candidates)
+    log.error(f"[NEXT][ERROR] No enabled Next button found. candidates={len(final_deduplicated)}")
     return False
 
 

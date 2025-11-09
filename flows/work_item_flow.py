@@ -177,9 +177,8 @@ def complete_work_item_dialog(driver, note: str = "Done", timeout: int = 10, obs
             EC.visibility_of_element_located((By.CSS_SELECTOR, "textarea.bp6-text-area")),
             desc="Correction textarea"
         )
-        time.sleep(5)
-        textarea.click()        
-        time.sleep(5)
+        #TODO: Clean up sleeps later
+        textarea.click()
         textarea.clear()
         time.sleep(5)
         textarea.send_keys(note)
