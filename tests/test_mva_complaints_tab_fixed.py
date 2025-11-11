@@ -22,6 +22,19 @@ DELAY = get_config("delay_seconds", default=2)
 @pytest.mark.smoke
 def test_mva_complaints_tab():
     print("Starting test_mva_complaints_tab...")
+    
+    # Add clear test session header
+    import uuid
+    from datetime import datetime
+    session_id = str(uuid.uuid4())[:8]
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    log.info("=" * 80)
+    log.info("🚀 E2E TEST SESSION STARTED")
+    log.info(f"📋 Session ID: {session_id}")
+    log.info(f"📅 Timestamp: {timestamp}")
+    log.info(f"🧪 Test: test_mva_complaints_tab")
+    log.info("=" * 80)
 
     # Initialize driver
     driver = driver_manager.get_or_create_driver()

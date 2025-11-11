@@ -49,12 +49,13 @@ class TestDataValidator:
         return mvas
     
     @staticmethod
-    def get_mvas_from_logs(log_file: str = "automation.log") -> Set[str]:
+    def get_mvas_from_logs(log_file: str = "automation.log", latest_session_only: bool = True) -> Set[str]:
         """
         Extract MVAs that were actually processed from log file.
         
         Args:
             log_file: Path to log file (default: automation.log)
+            latest_session_only: If True, only consider MVAs from the most recent test session
             
         Returns:
             Set[str]: Set of MVAs found in log entries
@@ -67,7 +68,6 @@ class TestDataValidator:
         processed_mvas = set()
         
         # Pattern to match MVA processing log entries
-        # Looks for: ">>> Starting MVA 12345678" or "[MVA] 12345678"
         mva_patterns = [
             r">>> Starting MVA (\d+)",
             r"\[MVA\] (\d+)",
@@ -75,12 +75,33 @@ class TestDataValidator:
             r"Processing MVA: (\d+)"
         ]
         
+        # Pattern to identify test session start - look for our explicit header
+        session_pattern = r"🚀 E2E TEST SESSION STARTED"
+        
         try:
             with open(log_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    for pattern in mva_patterns:
-                        matches = re.findall(pattern, line)
-                        processed_mvas.update(matches)
+                lines = f.readlines()
+            
+            if latest_session_only:
+                # Find the most recent test session start
+                latest_session_start = -1
+                for i, line in enumerate(lines):
+                    if session_pattern in line:
+                        latest_session_start = i
+                
+                # Only process lines from the latest session onward
+                if latest_session_start >= 0:
+                    lines = lines[latest_session_start:]
+                else:
+                    # Fallback: if no session marker found, use recent entries only
+                    lines = lines[-100:] if len(lines) > 100 else lines
+            
+            # Extract MVAs from the selected lines
+            for line in lines:
+                for pattern in mva_patterns:
+                    matches = re.findall(pattern, line)
+                    processed_mvas.update(matches)
+                    
         except Exception as e:
             # Log file might be locked or unreadable
             print(f"Warning: Could not read log file {log_path}: {e}")
@@ -89,13 +110,13 @@ class TestDataValidator:
     
     @staticmethod
     def validate_e2e_execution(require_all_mvas: bool = True, 
-                             max_age_hours: int = 1) -> Dict[str, any]:
+                             latest_session_only: bool = True) -> Dict[str, any]:
         """
         Validate that E2E test actually processed expected MVAs.
         
         Args:
             require_all_mvas: If True, all test MVAs must appear in logs
-            max_age_hours: Maximum age of log entries to consider (hours)
+            latest_session_only: If True, only consider MVAs from the most recent test session
             
         Returns:
             Dict with validation results
@@ -106,8 +127,8 @@ class TestDataValidator:
         # Get expected MVAs from test data
         expected_mvas = set(TestDataValidator.get_mvas_from_test_data())
         
-        # Get actual MVAs from logs
-        processed_mvas = TestDataValidator.get_mvas_from_logs()
+        # Get actual MVAs from logs (filtered by session if specified)
+        processed_mvas = TestDataValidator.get_mvas_from_logs(latest_session_only=latest_session_only)
         
         # Calculate validation metrics
         found_mvas = expected_mvas.intersection(processed_mvas)
@@ -168,15 +189,24 @@ class TestDataValidator:
                 raise
 
 
-def create_validation_report() -> str:
+def create_validation_report(latest_session_only: bool = True) -> str:
     """
     Create a detailed validation report for manual review.
+    
+    Args:
+        latest_session_only: Only consider MVAs from the most recent test session (default: True)
     
     Returns:
         str: Formatted validation report
     """
     try:
-        result = TestDataValidator.validate_e2e_execution(require_all_mvas=False)
+        result = TestDataValidator.validate_e2e_execution(require_all_mvas=False, latest_session_only=latest_session_only)
+        
+        # Format sections with better handling of empty lists
+        expected_section = chr(10).join(f"  - {mva}" for mva in result['expected_mvas'])
+        processed_section = chr(10).join(f"  ✅ {mva}" for mva in result['found_mvas']) or "  (None)"
+        missing_section = chr(10).join(f"  ❌ {mva}" for mva in result['missing_mvas']) or "  (None)"
+        unexpected_section = chr(10).join(f"  ⚠️ {mva}" for mva in result['unexpected_mvas']) or "  (None)"
         
         report = f"""
 # E2E Test Validation Report
@@ -186,20 +216,21 @@ def create_validation_report() -> str:
 - **Processed MVAs**: {result['processed_count']} 
 - **Success Rate**: {result['success_rate']:.1%}
 - **Missing MVAs**: {result['missing_count']}
+- **Unexpected MVAs**: {len(result['unexpected_mvas'])}
 
 ## Details
 
 ### Expected MVAs (from mva.csv):
-{chr(10).join(f"  - {mva}" for mva in result['expected_mvas'])}
+{expected_section}
 
 ### Successfully Processed MVAs:
-{chr(10).join(f"  ✅ {mva}" for mva in result['found_mvas'])}
+{processed_section}
 
 ### Missing MVAs (NOT processed):
-{chr(10).join(f"  ❌ {mva}" for mva in result['missing_mvas'])}
+{missing_section}
 
 ### Unexpected MVAs (in logs but not test data):
-{chr(10).join(f"  ⚠️ {mva}" for mva in result['unexpected_mvas'])}
+{unexpected_section}
 
 ## Validation Status
 {'✅ PASS: All test MVAs were processed' if result['missing_count'] == 0 else f'❌ FAIL: {result["missing_count"]} MVAs missing from logs'}
