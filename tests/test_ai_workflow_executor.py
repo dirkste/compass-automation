@@ -297,8 +297,12 @@ class TestPhaseMethodsIndividually:
         
         assert step.name == "validate_paths"
         assert step.completed is True
-        assert step.evidence == mock_review.return_value
-        assert self.execution.evidence_collected["documentation_reviewed"] is True
+        # Evidence now includes phase metadata
+        assert "markdown/gemini.md" in step.evidence
+        assert "readme.md" in step.evidence
+        assert step.evidence["phase"] == "validate_paths"
+        assert "collected_at" in step.evidence
+        assert self.execution.evidence_collected["validate_paths_completed"] is True
         assert step.error_message is None
     
     @patch('ai_workflow_executor.AIWorkflowExecutor._review_documentation')
@@ -310,7 +314,10 @@ class TestPhaseMethodsIndividually:
         
         assert step.name == "validate_paths"
         assert step.completed is False
-        assert step.error_message == "File not found"
+        assert "Phase 'validate_paths' failed: File not found" in step.error_message
+        # Error evidence includes debug info
+        assert step.evidence["phase"] == "validate_paths"
+        assert step.evidence["error_type"] == "Exception"
     
     @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
     def test_execute_branch_detection_phase_success(self, mock_execute):
@@ -324,9 +331,10 @@ class TestPhaseMethodsIndividually:
         assert step.name == "detect_branch"
         assert step.completed is True
         assert step.evidence["current_branch"] == "feature/test"
-        assert step.evidence["detected_branch"] == "feature/test"
+        assert step.evidence["detected_branch"] == "feature/test" 
         assert step.evidence["branch_match"] is True
-        assert self.execution.evidence_collected["branch_detected"] is True
+        assert step.evidence["phase"] == "detect_branch"
+        assert self.execution.evidence_collected["detect_branch_completed"] is True
     
     @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
     def test_execute_branch_detection_phase_mismatch(self, mock_execute):
@@ -374,7 +382,8 @@ class TestPhaseMethodsIndividually:
         assert step.completed is True
         assert step.evidence["success"] is True
         assert step.evidence["output"] == "All tests passed"
-        assert self.execution.evidence_collected["tests_executed"] is True
+        assert step.evidence["phase"] == "complete_test_execution"
+        assert self.execution.evidence_collected["complete_test_execution_completed"] is True
     
     @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
     def test_execute_test_execution_phase_failure(self, mock_execute):
@@ -387,7 +396,8 @@ class TestPhaseMethodsIndividually:
         step = self.executor._execute_test_execution_phase(self.execution)
         
         assert step.evidence["success"] is False
-        assert self.execution.evidence_collected["tests_executed"] is False
+        assert step.evidence["phase"] == "complete_test_execution"
+        assert self.execution.evidence_collected["complete_test_execution_completed"] is True
     
     @patch('ai_workflow_executor.AIWorkflowExecutor._check_e2e_dependencies')
     @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
@@ -809,8 +819,9 @@ class TestErrorHandlingAndEdgeCases:
             step = self.executor._execute_path_validation_phase(execution)
             
             assert step.completed is False
-            assert step.error_message == "Test error"
-            assert "documentation_reviewed" not in execution.evidence_collected
+            assert "Phase 'validate_paths' failed: Test error" in step.error_message
+            assert step.evidence["error_type"] == "Exception"
+            assert "validate_paths_completed" not in execution.evidence_collected
     
     def test_integration_assessment_with_step_errors(self):
         """Test integration assessment when some steps have errors"""

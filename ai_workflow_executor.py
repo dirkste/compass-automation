@@ -42,6 +42,127 @@ class WorkflowExecution:
     final_recommendation: Optional[str] = None
     end_time: Optional[datetime] = None
 
+class WorkflowPhaseEngine:
+    """
+    Standardized phase execution engine for workflow steps.
+    
+    Provides consistent error handling, evidence collection, and execution
+    patterns across all workflow phases.
+    """
+    
+    def __init__(self, executor_instance):
+        """Initialize with reference to the main executor"""
+        self.executor = executor_instance
+        
+    def execute_phase(self, phase_name: str, phase_description: str, 
+                     phase_function: callable, execution: WorkflowExecution,
+                     command: Optional[str] = None, **kwargs) -> WorkflowStep:
+        """
+        Execute a workflow phase with standardized error handling and evidence collection.
+        
+        Args:
+            phase_name: Unique identifier for the phase
+            phase_description: Human-readable description
+            phase_function: Function to execute for this phase
+            execution: Current workflow execution context
+            command: Optional shell command associated with the phase
+            **kwargs: Additional arguments to pass to phase_function
+            
+        Returns:
+            WorkflowStep with execution results and evidence
+        """
+        step = WorkflowStep(
+            name=phase_name,
+            description=phase_description,
+            command=command,
+            function=phase_function.__name__ if hasattr(phase_function, '__name__') else str(phase_function)
+        )
+        
+        try:
+            # Execute the phase function
+            evidence = phase_function(**kwargs)
+            
+            # Collect and structure evidence
+            step.evidence = self._collect_phase_evidence(phase_name, evidence)
+            step.completed = True
+            
+            # Update execution context
+            execution.evidence_collected[f"{phase_name}_completed"] = True
+            
+        except Exception as e:
+            # Handle phase errors consistently
+            error_context = self._handle_phase_error(phase_name, e, execution)
+            step.error_message = error_context["message"]
+            step.evidence = error_context["debug_info"]
+        
+        return step
+    
+    def _handle_phase_error(self, phase_name: str, error: Exception, 
+                          execution: WorkflowExecution) -> Dict[str, Any]:
+        """
+        Standardized error handling for workflow phases.
+        
+        Args:
+            phase_name: Name of the failed phase
+            error: The exception that occurred
+            execution: Current workflow execution context
+            
+        Returns:
+            Dict with error message and debug information
+        """
+        error_context = {
+            "message": f"Phase '{phase_name}' failed: {str(error)}",
+            "debug_info": {
+                "phase": phase_name,
+                "error_type": type(error).__name__,
+                "error_details": str(error),
+                "execution_id": id(execution),
+                "timestamp": datetime.now().isoformat()
+            }
+        }
+        
+        # Log error for debugging
+        print(f"⚠️  Workflow Phase Error: {error_context['message']}")
+        
+        return error_context
+    
+    def _collect_phase_evidence(self, phase_name: str, raw_evidence: Any) -> Dict[str, Any]:
+        """
+        Standardize evidence collection and formatting.
+        
+        Args:
+            phase_name: Name of the phase generating evidence
+            raw_evidence: Raw evidence data from phase execution
+            
+        Returns:
+            Standardized evidence dictionary
+        """
+        if raw_evidence is None:
+            return {"status": "no_evidence", "phase": phase_name}
+            
+        if isinstance(raw_evidence, dict):
+            return {
+                "phase": phase_name,
+                "collected_at": datetime.now().isoformat(),
+                **raw_evidence
+            }
+        elif isinstance(raw_evidence, (subprocess.CompletedProcess,)):
+            return {
+                "phase": phase_name,
+                "collected_at": datetime.now().isoformat(),
+                "command_output": raw_evidence.stdout,
+                "command_errors": raw_evidence.stderr,
+                "return_code": raw_evidence.returncode,
+                "success": raw_evidence.returncode == 0
+            }
+        else:
+            return {
+                "phase": phase_name,
+                "collected_at": datetime.now().isoformat(),
+                "raw_data": str(raw_evidence),
+                "data_type": type(raw_evidence).__name__
+            }
+
 class AIWorkflowExecutor:
     """Automatically executes evaluation workflows based on detected context"""
     
@@ -49,6 +170,7 @@ class AIWorkflowExecutor:
         """Initialize the workflow executor"""
         self.project_root = Path(project_root)
         self.execution_history: List[WorkflowExecution] = []
+        self.phase_engine = WorkflowPhaseEngine(self)
         
     def execute_workflow(self, detection_result: DetectionResult) -> WorkflowExecution:
         """
@@ -203,44 +325,35 @@ class AIWorkflowExecutor:
     # Phase extraction methods for _execute_integration_assessment refactoring
     def _execute_path_validation_phase(self, execution: WorkflowExecution) -> WorkflowStep:
         """Execute Phase 1: Path configuration validation"""
-        step = WorkflowStep(
-            name="validate_paths",
-            description="Validate project paths and configuration",
-            function="review_documentation"
+        return self.phase_engine.execute_phase(
+            phase_name="validate_paths",
+            phase_description="Validate project paths and configuration", 
+            phase_function=self._review_documentation,
+            execution=execution
         )
-        
-        try:
-            documentation = self._review_documentation()
-            step.completed = True
-            step.evidence = documentation
-            execution.evidence_collected["documentation_reviewed"] = True
-        except Exception as e:
-            step.error_message = str(e)
-        
-        return step
     
     def _execute_branch_detection_phase(self, execution: WorkflowExecution, detection: DetectionResult) -> WorkflowStep:
         """Execute Phase 2: Git branch detection and validation"""
-        step = WorkflowStep(
-            name="detect_branch",
-            description="Detect current git branch and validate context",
-            command=f"git branch --show-current"
+        return self.phase_engine.execute_phase(
+            phase_name="detect_branch",
+            phase_description="Detect current git branch and validate context",
+            phase_function=self._detect_branch_info,
+            execution=execution,
+            command="git branch --show-current",
+            detection=detection
         )
-        
-        try:
-            result = self._execute_command(step.command)
-            step.completed = True
-            current_branch = result.stdout.strip()
-            step.evidence = {
-                "current_branch": current_branch,
-                "detected_branch": detection.detected_branch,
-                "branch_match": current_branch == detection.detected_branch
-            }
-            execution.evidence_collected["branch_detected"] = True
-        except Exception as e:
-            step.error_message = str(e)
-        
-        return step
+    
+    def _detect_branch_info(self, command: str = "git branch --show-current", detection: DetectionResult = None) -> Dict[str, Any]:
+        """Helper method for branch detection phase"""
+        result = self._execute_command(command)
+        current_branch = result.stdout.strip()
+        return {
+            "current_branch": current_branch,
+            "detected_branch": detection.detected_branch if detection else None,
+            "branch_match": current_branch == (detection.detected_branch if detection else ""),
+            "command_output": result.stdout,
+            "return_code": result.returncode
+        }
     
     def _execute_history_analysis_phase(self, execution: WorkflowExecution, detection: DetectionResult) -> WorkflowStep:
         """Execute Phase 3: Repository history analysis"""
@@ -262,26 +375,24 @@ class AIWorkflowExecutor:
     
     def _execute_test_execution_phase(self, execution: WorkflowExecution) -> WorkflowStep:
         """Execute Phase 4: Complete test execution"""
-        step = WorkflowStep(
-            name="complete_test_execution", 
-            description="Execute comprehensive test suite",
+        return self.phase_engine.execute_phase(
+            phase_name="complete_test_execution",
+            phase_description="Execute comprehensive test suite",
+            phase_function=self._execute_test_command,
+            execution=execution,
             command="python run_tests.py --quiet"
         )
-        
-        try:
-            result = self._execute_command(step.command)
-            step.completed = True
-            test_success = result.returncode == 0
-            step.evidence = {
-                "output": result.stdout,
-                "success": test_success,
-                "test_command": step.command
-            }
-            execution.evidence_collected["tests_executed"] = test_success
-        except Exception as e:
-            step.error_message = str(e)
-        
-        return step
+    
+    def _execute_test_command(self, command: str = "python run_tests.py --quiet") -> Dict[str, Any]:
+        """Helper method for test execution phase"""
+        result = self._execute_command(command)
+        test_success = result.returncode == 0
+        return {
+            "output": result.stdout,
+            "success": test_success,
+            "test_command": command,
+            "return_code": result.returncode
+        }
     
     def _execute_e2e_validation_phase(self, execution: WorkflowExecution) -> WorkflowStep:
         """Execute Phase 5: End-to-end validation"""
