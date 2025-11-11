@@ -552,9 +552,7 @@ def _deduplicate_elements(elements):
             out.append(el)
         except Exception:
             continue
-    time.sleep(10)
     return out
-
 def _is_element_enabled(el):
     """Check if element is enabled and not disabled via aria or class."""
     try:
@@ -615,8 +613,7 @@ def click_next_in_dialog(driver, timeout: int = 10) -> bool:
     """
     # Wait until at least one candidate is present and enabled
     end = time.time() + timeout
-    print("[NEXT][SCAN] searching for Next buttonâ€¦")
-    
+    print("[NEXT][SCAN] searching for Next button...")    
     while time.time() < end:
         # Phase 1: Find and deduplicate candidates
         raw_candidates = _find_next_button_candidates(driver)
