@@ -1,0 +1,208 @@
+{
+  "timestamp": "2025-11-11T19:23:52.575208",
+  "description": "Comprehensive baseline benchmark - 114 tests in 9.94s",
+  "summary": {
+    "total_duration": 9.963823500322178,
+    "average_duration": 0.7664479615632445,
+    "min_duration": 4.279986023902893e-05,
+    "max_duration": 5.993705900153145,
+    "memory_usage_mb": 40.49639423076923,
+    "memory_peak_mb": 45.7578125,
+    "cpu_average": 14.13076923076923,
+    "operation_count": 13
+  },
+  "metrics": [
+    {
+      "name": "import_utils.logger",
+      "duration": 9.75998118519783e-05,
+      "memory_start": 24.28515625,
+      "memory_end": 24.28515625,
+      "cpu_percent": 8.9,
+      "metadata": {
+        "module": "utils.logger",
+        "statement": "from utils.logger import log"
+      }
+    },
+    {
+      "name": "import_config.config_loader",
+      "duration": 4.279986023902893e-05,
+      "memory_start": 24.29296875,
+      "memory_end": 24.29296875,
+      "cpu_percent": 0.0,
+      "metadata": {
+        "module": "config.config_loader",
+        "statement": "from config.config_loader import get_config"
+      }
+    },
+    {
+      "name": "import_utils.data_loader",
+      "duration": 0.0010073999874293804,
+      "memory_start": 24.29296875,
+      "memory_end": 24.34765625,
+      "cpu_percent": 33.3,
+      "metadata": {
+        "module": "utils.data_loader",
+        "statement": "from utils.data_loader import load_mvas"
+      }
+    },
+    {
+      "name": "import_pages.login_page",
+      "duration": 0.34140209993347526,
+      "memory_start": 24.34765625,
+      "memory_end": 45.00390625,
+      "cpu_percent": 10.3,
+      "metadata": {
+        "module": "pages.login_page",
+        "statement": "from pages.login_page import LoginPage"
+      }
+    },
+    {
+      "name": "import_ai_workflow_executor",
+      "duration": 0.009662900120019913,
+      "memory_start": 45.00390625,
+      "memory_end": 45.8515625,
+      "cpu_percent": 25.0,
+      "metadata": {
+        "module": "ai_workflow_executor",
+        "statement": "from ai_workflow_executor import AIWorkflowExecutor"
+      }
+    },
+    {
+      "name": "import_ai_context_detector",
+      "duration": 4.600011743605137e-05,
+      "memory_start": 45.8515625,
+      "memory_end": 45.8515625,
+      "cpu_percent": 0.0,
+      "metadata": {
+        "module": "ai_context_detector",
+        "statement": "from ai_context_detector import AIContextDetector"
+      }
+    },
+    {
+      "name": "mva_data_loading",
+      "duration": 0.0009956001304090023,
+      "memory_start": 46.484375,
+      "memory_end": 46.49609375,
+      "cpu_percent": 12.5,
+      "metadata": {
+        "operation": "load_mvas_from_csv"
+      }
+    },
+    {
+      "name": "log_processing",
+      "duration": 0.004757200134918094,
+      "memory_start": 46.49609375,
+      "memory_end": 44.90625,
+      "cpu_percent": 0.0,
+      "metadata": {
+        "operation": "validation_report_generation"
+      }
+    },
+    {
+      "name": "test_suite_smoke_tests",
+      "duration": 0.8969761999323964,
+      "memory_start": 45.47265625,
+      "memory_end": 45.01953125,
+      "cpu_percent": 14.7,
+      "metadata": {
+        "suite_name": "smoke_tests"
+      }
+    },
+    {
+      "name": "test_suite_unit_tests",
+      "duration": 0.9258459000848234,
+      "memory_start": 45.578125,
+      "memory_end": 45.03515625,
+      "cpu_percent": 20.0,
+      "metadata": {
+        "suite_name": "unit_tests"
+      }
+    },
+    {
+      "name": "test_suite_integration_tests",
+      "duration": 0.9140343000181019,
+      "memory_start": 45.63671875,
+      "memory_end": 45.0859375,
+      "cpu_percent": 12.4,
+      "metadata": {
+        "suite_name": "integration_tests"
+      }
+    },
+    {
+      "name": "test_suite_ai_workflow_tests",
+      "duration": 5.993705900153145,
+      "memory_start": 45.63671875,
+      "memory_end": 45.1328125,
+      "cpu_percent": 31.1,
+      "metadata": {
+        "suite_name": "ai_workflow_tests"
+      }
+    },
+    {
+      "name": "test_suite_ai_context_tests",
+      "duration": 0.8752496000379324,
+      "memory_start": 45.6953125,
+      "memory_end": 45.14453125,
+      "cpu_percent": 15.5,
+      "metadata": {
+        "suite_name": "ai_context_tests"
+      }
+    }
+  ],
+  "resource_data": [
+    {
+      "timestamp": 1762907031.6116323,
+      "memory_mb": 45.15234375,
+      "cpu_percent": 0.0,
+      "threads": 5
+    },
+    {
+      "timestamp": 1762907031.7168274,
+      "memory_mb": 45.7578125,
+      "cpu_percent": 0.0,
+      "threads": 7
+    },
+    {
+      "timestamp": 1762907031.8243876,
+      "memory_mb": 45.7578125,
+      "cpu_percent": 0.0,
+      "threads": 7
+    },
+    {
+      "timestamp": 1762907031.9310975,
+      "memory_mb": 45.7578125,
+      "cpu_percent": 0.0,
+      "threads": 7
+    },
+    {
+      "timestamp": 1762907032.038824,
+      "memory_mb": 45.7578125,
+      "cpu_percent": 0.0,
+      "threads": 7
+    },
+    {
+      "timestamp": 1762907032.1463366,
+      "memory_mb": 45.7578125,
+      "cpu_percent": 14.5,
+      "threads": 7
+    },
+    {
+      "timestamp": 1762907032.2526252,
+      "memory_mb": 45.7578125,
+      "cpu_percent": 14.7,
+      "threads": 7
+    },
+    {
+      "timestamp": 1762907032.3577788,
+      "memory_mb": 45.7578125,
+      "cpu_percent": 0.0,
+      "threads": 7
+    },
+    {
+      "timestamp": 1762907032.4638329,
+      "memory_mb": 45.7578125,
+      "cpu_percent": 0.0,
+      "threads": 7
+    }
+  ]
+}
