@@ -260,7 +260,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
-def is_mva_known(driver, mva: str, timeout: int = 8) -> bool:
+def is_mva_known(driver, mva: str, timeout: int = 15) -> bool:
 
     """Return True if vehicle-properties-container loads, else False (unknown MVA)."""
 
@@ -272,7 +272,7 @@ def is_mva_known(driver, mva: str, timeout: int = 8) -> bool:
 
             EC.presence_of_element_located(
 
-                (By.CSS_SELECTOR, "div.fleet-operations-pwa__vehicle-properties-container__tniqjm")
+                (By.XPATH, "//div[contains(@class,'vehicle-properties-container')]")
 
             )
 
