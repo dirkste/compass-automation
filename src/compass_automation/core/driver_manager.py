@@ -5,9 +5,11 @@ import winreg
 import logging
 from selenium import webdriver
 from selenium.common.exceptions import SessionNotCreatedException
-from compass_automation.utils.project_paths import ProjectPaths
+from selenium.webdriver.edge.service import Service
 
-DRIVER_PATH = str(ProjectPaths.get_project_root() / "msedgedriver.exe")
+from compass_automation.core.driver_downloader import DriverDownloader
+
+DRIVER_PATH = str(DriverDownloader.DRIVER_PATH)
 # Logger
 
 log = logging.getLogger("mc.automation")
@@ -100,5 +102,11 @@ def quit_driver():
     global _driver
     if _driver:
         log.info("[DRIVER] Quitting Edge WebDriver...")
-        _driver.quit()
-        _driver = None
+        try:
+            quit_fn = getattr(_driver, "quit", None)
+            if callable(quit_fn):
+                quit_fn()
+            else:
+                log.warning(f"[DRIVER] Singleton driver has no quit(): {_driver!r}")
+        finally:
+            _driver = None
