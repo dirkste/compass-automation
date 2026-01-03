@@ -14,7 +14,7 @@ class TestMVAValidation:
     
     def test_mva_format_validation(self):
         """Test that MVAs are properly formatted."""
-        from utils.data_loader import load_mvas
+        from compass_automation.utils.data_loader import load_mvas
         
         # Test various MVA formats
         csv_content = "54252855\n1234\n999999999\n"
@@ -35,7 +35,7 @@ class TestMVAValidation:
     
     def test_mva_empty_lines_filtered(self):
         """Test that empty lines in CSV are filtered out."""
-        from utils.data_loader import load_mvas
+        from compass_automation.utils.data_loader import load_mvas
         
         csv_content = "54252855\n\n\n56035512\n   \n51594211\n"
         
@@ -59,7 +59,7 @@ class TestDomainObjectEdgeCases:
     
     def test_complaint_without_created_date(self):
         """Test Complaint with no created_at date."""
-        from pages.complaint import Complaint
+        from compass_automation.pages.complaint import Complaint
         
         complaint = Complaint(id="123", type="PM", status="Open")
         assert complaint.created_at is None
@@ -67,7 +67,7 @@ class TestDomainObjectEdgeCases:
     
     def test_work_item_without_completion_date(self):
         """Test WorkItem with no completed_at date."""
-        from pages.work_item import WorkItem
+        from compass_automation.pages.work_item import WorkItem
         
         work_item = WorkItem(id="456", type="PM", status="Open")
         assert work_item.completed_at is None
@@ -75,7 +75,7 @@ class TestDomainObjectEdgeCases:
     
     def test_vehicle_without_purchase_date(self):
         """Test Vehicle with no purchase_date."""
-        from pages.vehicle import Vehicle
+        from compass_automation.pages.vehicle import Vehicle
         
         vehicle = Vehicle(mva="54252855")
         assert vehicle.purchase_date is None
@@ -83,8 +83,8 @@ class TestDomainObjectEdgeCases:
     
     def test_status_case_insensitive(self):
         """Test that status checks are case-insensitive."""
-        from pages.complaint import Complaint
-        from pages.work_item import WorkItem
+        from compass_automation.pages.complaint import Complaint
+        from compass_automation.pages.work_item import WorkItem
         
         # Test different cases
         complaint1 = Complaint(id="1", type="PM", status="OPEN")
@@ -113,12 +113,12 @@ class TestConfigurationEdgeCases:
         with pytest.raises(RuntimeError, match="Missing file"):
             # Re-import to trigger the error
             import importlib
-            from config import config_loader
+            from compass_automation.config import config_loader
             importlib.reload(config_loader)
     
     def test_config_nested_key_access(self):
         """Test accessing nested configuration keys."""
-        from config.config_loader import get_config
+        from compass_automation.config.config_loader import get_config
         
         # Test the nested logging config
         log_level = get_config("logging.level", "INFO")
@@ -130,7 +130,7 @@ class TestDriverManagerEdgeCases:
     
     def test_driver_path_constant_exists(self):
         """Test that DRIVER_PATH constant is properly defined."""
-        from core.driver_manager import DRIVER_PATH
+        from compass_automation.core.driver_manager import DRIVER_PATH
         
         assert isinstance(DRIVER_PATH, str)
         assert DRIVER_PATH.endswith("msedgedriver.exe")
@@ -139,7 +139,7 @@ class TestDriverManagerEdgeCases:
     @patch('subprocess.check_output')
     def test_malformed_version_output(self, mock_subprocess):
         """Test handling of malformed version output."""
-        from core.driver_manager import get_driver_version
+        from compass_automation.core.driver_manager import get_driver_version
         
         # Test various malformed outputs
         test_cases = [
@@ -162,7 +162,7 @@ class TestLoggerEdgeCases:
     
     def test_color_codes_defined(self):
         """Test that color codes are properly defined."""
-        from utils.logger import ColorFormatter
+        from compass_automation.utils.logger import ColorFormatter
         
         formatter = ColorFormatter("")
         
@@ -175,7 +175,7 @@ class TestLoggerEdgeCases:
     
     def test_logger_has_correct_name(self):
         """Test that logger has the expected name."""
-        from utils.logger import log
+        from compass_automation.utils.logger import log
         
         assert log.name == "mc.automation"
 
@@ -185,7 +185,7 @@ class TestDataIntegrity:
     
     def test_csv_with_multiple_columns(self):
         """Test CSV handling when there are multiple columns."""
-        from utils.data_loader import load_mvas
+        from compass_automation.utils.data_loader import load_mvas
         
         csv_content = "54252855,37482\n56035512,20941\n51594211,86401\n"
         
@@ -204,7 +204,7 @@ class TestDataIntegrity:
     
     def test_age_calculation_accuracy(self):
         """Test that age calculations are accurate."""
-        from pages.vehicle import Vehicle
+        from compass_automation.pages.vehicle import Vehicle
         
         # Create a vehicle with a known date
         past_date = datetime.now() - timedelta(days=100)
@@ -220,7 +220,7 @@ class TestErrorRecovery:
     
     def test_data_loader_file_permission_error(self):
         """Test handling of file permission errors."""
-        from utils.data_loader import load_mvas
+        from compass_automation.utils.data_loader import load_mvas
         
         # This should raise an exception that gets propagated
         with pytest.raises((PermissionError, FileNotFoundError)):
@@ -228,7 +228,7 @@ class TestErrorRecovery:
     
     def test_empty_config_values(self):
         """Test handling of empty configuration values."""
-        from config.config_loader import get_config
+        from compass_automation.config.config_loader import get_config
         
         # Test with empty string as default
         result = get_config("nonexistent", "")

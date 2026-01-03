@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from utils.project_paths import ProjectPaths, get_config_file_path, get_data_file_path, get_project_root_path
+from compass_automation.utils.project_paths import ProjectPaths, get_config_file_path, get_data_file_path, get_project_root_path
 
 
 class TestProjectPaths:
@@ -38,11 +38,12 @@ class TestProjectPaths:
         root = ProjectPaths.get_project_root()
         
         # Verify it contains key project structure
-        assert (root / "utils").is_dir()
-        assert (root / "config").is_dir()
-        assert (root / "pages").is_dir()
+        assert (root / "src").is_dir()
+        assert (root / "src" / "compass_automation" / "utils").is_dir()
+        assert (root / "src" / "compass_automation" / "config").is_dir()
+        assert (root / "src" / "compass_automation" / "pages").is_dir()
         assert (root / "tests").is_dir()
-        assert (root / "utils" / "project_paths.py").is_file()
+        assert (root / "src" / "compass_automation" / "utils" / "project_paths.py").is_file()
     
     def test_get_config_path_default_filename(self):
         """Test get_config_path with default config.json filename."""
@@ -216,20 +217,20 @@ class TestPathResolutionEdgeCases:
         assert config1 == config2
         assert str(config1) == str(config2)
     
-    @patch('utils.project_paths.Path')
+    @patch('compass_automation.utils.project_paths.Path')
     def test_project_root_calculation_logic(self, mock_path):
         """Test the project root calculation logic."""
-        # Mock the __file__ path to simulate being in utils/project_paths.py
-        mock_file_path = Path("/fake/project/utils/project_paths.py")
-        mock_path.return_value.parent.parent.resolve.return_value = Path("/fake/project")
+        # Mock the __file__ path to simulate being in src/compass_automation/utils/project_paths.py
+        mock_file_path = Path("/fake/project/src/compass_automation/utils/project_paths.py")
+        mock_path.return_value.parent.parent.parent.parent.resolve.return_value = Path("/fake/project")
         
         # Reset cache and call method
         ProjectPaths._project_root = None
-        with patch('utils.project_paths.__file__', str(mock_file_path)):
+        with patch('compass_automation.utils.project_paths.__file__', str(mock_file_path)):
             root = ProjectPaths.get_project_root()
         
-        # Should have called the path resolution logic
-        assert mock_path.return_value.parent.parent.resolve.called
+        # Should have called the path resolution logic (4 levels up)
+        assert mock_path.return_value.parent.parent.parent.parent.resolve.called
 
 
 class TestIntegrationWithExistingCode:
