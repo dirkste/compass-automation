@@ -8,6 +8,8 @@ from typing import Tuple
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from compass_automation.utils.logger import log
+
 from .base_page import BasePage
 
 try:
@@ -75,8 +77,8 @@ class ComplaintTypePage(BasePage):
             btn.click()
             log.info(f"[COMPLAINT] {mva or ''} - PM tile clicked (auto-forward)")
             return True
-        except Exception:
+        except Exception as e:
             log.warning(
-                "[COMPLAINT][WARN] {mva or ''} - PM tile not found/clickable ({e})"
+                f"[COMPLAINT][WARN] {mva or ''} - PM tile not found/clickable ({e})"
             )
             return False

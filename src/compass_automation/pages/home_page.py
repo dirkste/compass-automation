@@ -1,4 +1,4 @@
-from logging import log
+from compass_automation.utils.logger import log
 
 from selenium.webdriver.support.ui import WebDriverWait
 
