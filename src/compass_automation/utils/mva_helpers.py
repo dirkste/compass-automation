@@ -3,6 +3,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from compass_automation.utils.logger import log
+
 
 def wait_for_mva_match(driver, mva, timeout=30):
     """Waits for the MVA details to appear on the page, confirming successful lookup."""
@@ -53,7 +55,7 @@ def select_pm_complaint(driver, timeout=30):
                 tile.click()
                 log.info(f"Selected complaint with type: {content}")
                 return True
-        except Exception:
+        except Exception as e:
             log.info(f"[DEBUG] Skipped a tile due to error: {e}")
 
     print("No 'PM' complaint found.")

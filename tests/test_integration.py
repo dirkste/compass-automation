@@ -3,7 +3,7 @@ Integration tests for version compatibility and system checks.
 These tests verify real system state without requiring browser launch.
 """
 import pytest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 class TestVersionCompatibility:
@@ -100,21 +100,28 @@ class TestVersionCompatibility:
     
     def test_version_mismatch_detection(self):
         """Test that version mismatch is detected and logged as warning."""
-        from compass_automation.core.driver_manager import get_or_create_driver
-        
-        # Mock incompatible versions to test graceful fallback
-        # The system should now log a warning but not raise an error
-        with patch('compass_automation.core.driver_manager.get_browser_version', return_value="142.0.3595.65"):
-            with patch('compass_automation.core.driver_manager.get_driver_version', return_value="141.0.3485.54"):
-                # This should NOT raise an error anymore - graceful fallback
-                # Just verify that the driver manager can be called
-                try:
-                    # Don't actually create driver in test, just call the method
-                    browser = patch('compass_automation.core.driver_manager.get_browser_version', return_value="142.0.3595.65")
-                    driver_ver = patch('compass_automation.core.driver_manager.get_driver_version', return_value="141.0.3485.54")
-                    print("✅ Version mismatch detected and handled gracefully")
-                except RuntimeError:
-                    pytest.fail("Version mismatch should not raise RuntimeError (graceful fallback)")
+        import compass_automation.core.driver_manager as driver_manager
+
+        # Mock incompatible versions to ensure we warn but still proceed.
+        with patch("compass_automation.core.driver_manager.get_browser_version", return_value="142.0.3595.65"), \
+             patch("compass_automation.core.driver_manager.get_driver_version", return_value="141.0.3485.54"), \
+             patch("compass_automation.core.driver_manager.os.path.exists", return_value=False), \
+             patch("compass_automation.core.driver_manager.log.warning") as mock_warn, \
+             patch("compass_automation.core.driver_manager.webdriver.Edge") as mock_edge:
+            # Ensure we don't leak a fake singleton into other tests.
+            driver_manager._driver = None
+            mock_driver = MagicMock(name="mock_driver")
+            mock_edge.return_value = mock_driver
+
+            driver = driver_manager.get_or_create_driver()
+            assert driver is mock_driver
+            assert mock_warn.called, "Expected version mismatch to be logged as a warning"
+
+            # Clean up so later e2e tests can create a real driver.
+            driver_manager.quit_driver()
+            assert driver_manager._driver is None
+
+            print("✅ Version mismatch detected and handled gracefully")
     
     
     def test_compatible_versions_pass(self):
