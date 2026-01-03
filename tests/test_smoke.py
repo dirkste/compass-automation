@@ -15,13 +15,13 @@ class TestQuickSmoke:
         project_root = os.path.dirname(os.path.dirname(__file__))
         
         essential_files = [
-            "config/config.json",
-            "core/driver_manager.py", 
-            "utils/data_loader.py",
-            "utils/logger.py",
-            "pages/complaint.py",
-            "pages/work_item.py",
-            "pages/vehicle.py"
+            "src/compass_automation/config/config.json",
+            "src/compass_automation/core/driver_manager.py", 
+            "src/compass_automation/utils/data_loader.py",
+            "src/compass_automation/utils/logger.py",
+            "src/compass_automation/pages/complaint.py",
+            "src/compass_automation/pages/work_item.py",
+            "src/compass_automation/pages/vehicle.py"
         ]
         
         for file_path in essential_files:
@@ -32,14 +32,14 @@ class TestQuickSmoke:
         """Test that all major modules can be imported without errors."""
         try:
             # Core imports
-            from core import driver_manager
-            from config import config_loader
+            from compass_automation.core import driver_manager
+            from compass_automation.config import config_loader
             
             # Utils imports  
-            from utils import data_loader, logger
+            from compass_automation.utils import data_loader, logger
             
             # Pages imports
-            from pages import complaint, work_item, vehicle
+            from compass_automation.pages import complaint, work_item, vehicle
             
             # All imports successful
             assert True
@@ -49,7 +49,7 @@ class TestQuickSmoke:
     
     def test_config_basic_access(self):
         """Test basic config access works."""
-        from config.config_loader import get_config
+        from compass_automation.config.config_loader import get_config
         
         # These keys should exist in the config
         username = get_config("username")
@@ -62,7 +62,7 @@ class TestQuickSmoke:
     
     def test_logger_basic_functionality(self):
         """Test that logging works without errors."""
-        from utils.logger import log
+        from compass_automation.utils.logger import log
         
         # These should not raise exceptions
         log.debug("Test debug message")
@@ -73,7 +73,7 @@ class TestQuickSmoke:
     
     def test_data_loader_basic_functionality(self):
         """Test basic data loading functionality."""
-        from utils.data_loader import load_mvas
+        from compass_automation.utils.data_loader import load_mvas
         
         # Create a simple test CSV
         csv_content = "12345\n67890\n"
@@ -92,9 +92,9 @@ class TestQuickSmoke:
     
     def test_domain_objects_creation(self):
         """Test that domain objects can be created."""
-        from pages.complaint import Complaint
-        from pages.work_item import WorkItem
-        from pages.vehicle import Vehicle
+        from compass_automation.pages.complaint import Complaint
+        from compass_automation.pages.work_item import WorkItem
+        from compass_automation.pages.vehicle import Vehicle
         
         # Should not raise exceptions
         complaint = Complaint(id="1", type="PM", status="Open")
@@ -107,14 +107,14 @@ class TestQuickSmoke:
     
     def test_driver_manager_constants(self):
         """Test that driver manager constants are defined."""
-        from core.driver_manager import DRIVER_PATH
+        from compass_automation.core.driver_manager import DRIVER_PATH
         
         assert isinstance(DRIVER_PATH, str)
         assert "msedgedriver.exe" in DRIVER_PATH
     
     def test_version_check_functions_exist(self):
         """Test that version checking functions exist and are callable."""
-        from core.driver_manager import get_browser_version, get_driver_version
+        from compass_automation.core.driver_manager import get_browser_version, get_driver_version
         
         # These functions should exist and be callable
         assert callable(get_browser_version)
@@ -131,7 +131,7 @@ class TestPerformance:
     def test_config_loading_is_fast(self):
         """Test that config loading is fast (cached)."""
         import time
-        from config.config_loader import get_config
+        from compass_automation.config.config_loader import get_config
         
         start_time = time.time()
         
@@ -149,7 +149,7 @@ class TestPerformance:
     def test_domain_object_creation_is_fast(self):
         """Test that domain object creation is fast."""
         import time
-        from pages.complaint import Complaint
+        from compass_automation.pages.complaint import Complaint
         
         start_time = time.time()
         
@@ -168,7 +168,7 @@ class TestDataValidation:
     
     def test_mva_data_types(self):
         """Test that MVA data is properly typed."""
-        from utils.data_loader import load_mvas
+        from compass_automation.utils.data_loader import load_mvas
         
         csv_content = "12345\n67890\n11111\n"
         
@@ -191,8 +191,8 @@ class TestDataValidation:
     
     def test_status_validation(self):
         """Test that status values are properly validated."""
-        from pages.complaint import Complaint
-        from pages.work_item import WorkItem
+        from compass_automation.pages.complaint import Complaint
+        from compass_automation.pages.work_item import WorkItem
         
         # Test valid statuses
         valid_complaint_statuses = ["Open", "Closed", "OPEN", "open", "closed"]

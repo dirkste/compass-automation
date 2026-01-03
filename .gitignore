@@ -30,3 +30,13 @@ Thumbs.db
 *.tmp
 tests/test_sanity_launch.py
 validation_report.md
+
+# Drivers
+msedgedriver.exe
+chromedriver.exe
+geckodriver.exe
+
+# Artifacts
+*.png
+python-*.exe
+benchmarks/

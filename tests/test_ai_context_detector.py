@@ -7,7 +7,7 @@ and the extraction of branch/target information.
 """
 
 import pytest
-from ai_context_detector import (
+from tools.ai.ai_context_detector import (
     AIContextDetector, 
     WorkflowType, 
     DetectionResult,

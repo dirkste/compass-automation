@@ -17,12 +17,12 @@ from pathlib import Path
 import subprocess
 import json
 
-from ai_workflow_executor import (
+from tools.ai.ai_workflow_executor import (
     AIWorkflowExecutor, 
     WorkflowExecution, 
     WorkflowStep,
 )
-from ai_context_detector import WorkflowType, DetectionResult
+from tools.ai.ai_context_detector import WorkflowType, DetectionResult
 
 
 class TestWorkflowDataClasses:
@@ -200,12 +200,12 @@ class TestIntegrationAssessmentWorkflow:
             confidence=0.9
         )
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_path_validation_phase')
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_branch_detection_phase')
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_history_analysis_phase')
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_test_execution_phase')
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_e2e_validation_phase')
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_integration_decision_phase')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_path_validation_phase')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_branch_detection_phase')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_history_analysis_phase')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_test_execution_phase')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_e2e_validation_phase')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_integration_decision_phase')
     def test_integration_assessment_phase_execution_order(self, mock_decision, mock_e2e, 
                                                          mock_test, mock_history, 
                                                          mock_branch, mock_path):
@@ -285,7 +285,7 @@ class TestPhaseMethodsIndividually:
             confidence=0.9
         )
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._review_documentation')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._review_documentation')
     def test_execute_path_validation_phase_success(self, mock_review):
         """Test path validation phase with successful documentation review"""
         mock_review.return_value = {
@@ -305,7 +305,7 @@ class TestPhaseMethodsIndividually:
         assert self.execution.evidence_collected["validate_paths_completed"] is True
         assert step.error_message is None
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._review_documentation')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._review_documentation')
     def test_execute_path_validation_phase_error(self, mock_review):
         """Test path validation phase with error"""
         mock_review.side_effect = Exception("File not found")
@@ -319,7 +319,7 @@ class TestPhaseMethodsIndividually:
         assert step.evidence["phase"] == "validate_paths"
         assert step.evidence["error_type"] == "Exception"
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_command')
     def test_execute_branch_detection_phase_success(self, mock_execute):
         """Test branch detection phase with successful command execution"""
         mock_result = Mock()
@@ -336,7 +336,7 @@ class TestPhaseMethodsIndividually:
         assert step.evidence["phase"] == "detect_branch"
         assert self.execution.evidence_collected["detect_branch_completed"] is True
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_command')
     def test_execute_branch_detection_phase_mismatch(self, mock_execute):
         """Test branch detection with branch mismatch"""
         mock_result = Mock()
@@ -349,7 +349,7 @@ class TestPhaseMethodsIndividually:
         assert step.evidence["detected_branch"] == "feature/test"
         assert step.evidence["branch_match"] is False
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_command')
     def test_execute_history_analysis_phase(self, mock_execute):
         """Test history analysis phase"""
         mock_result = Mock()
@@ -368,7 +368,7 @@ class TestPhaseMethodsIndividually:
         expected_command = "git log --oneline -10 feature/test"
         mock_execute.assert_called_once_with(expected_command)
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_command')
     def test_execute_test_execution_phase_success(self, mock_execute):
         """Test test execution phase with successful tests"""
         mock_result = Mock()
@@ -385,7 +385,7 @@ class TestPhaseMethodsIndividually:
         assert step.evidence["phase"] == "complete_test_execution"
         assert self.execution.evidence_collected["complete_test_execution_completed"] is True
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_command')
     def test_execute_test_execution_phase_failure(self, mock_execute):
         """Test test execution phase with test failures"""
         mock_result = Mock()
@@ -399,8 +399,8 @@ class TestPhaseMethodsIndividually:
         assert step.evidence["phase"] == "complete_test_execution"
         assert self.execution.evidence_collected["complete_test_execution_completed"] is True
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._check_e2e_dependencies')
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._check_e2e_dependencies')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_command')
     def test_execute_e2e_validation_phase_with_dependencies(self, mock_execute, mock_check):
         """Test E2E validation phase when dependencies are available"""
         mock_check.return_value = True
@@ -417,7 +417,7 @@ class TestPhaseMethodsIndividually:
         assert step.evidence["dependencies_available"] is True
         assert self.execution.evidence_collected["e2e_validated"] is True
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._check_e2e_dependencies')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._check_e2e_dependencies')
     def test_execute_e2e_validation_phase_no_dependencies(self, mock_check):
         """Test E2E validation phase when dependencies are not available"""
         mock_check.return_value = False
@@ -429,7 +429,7 @@ class TestPhaseMethodsIndividually:
         assert step.evidence["dependencies_available"] is False
         assert self.execution.evidence_collected["e2e_validated"] == "skipped"
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._make_integration_decision')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._make_integration_decision')
     def test_execute_integration_decision_phase(self, mock_decision):
         """Test integration decision phase"""
         mock_decision.return_value = {
@@ -542,9 +542,9 @@ class TestTestValidationWorkflow:
             confidence=0.8
         )
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._verify_test_dependencies')
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
-    @patch('ai_workflow_executor.AIWorkflowExecutor._assess_system_readiness')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._verify_test_dependencies')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_command')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._assess_system_readiness')
     def test_test_validation_workflow_success(self, mock_assess, mock_execute, mock_verify):
         """Test successful test validation workflow"""
         # Mock dependencies check
@@ -571,7 +571,7 @@ class TestTestValidationWorkflow:
         assert self.execution.completed is True
         assert self.execution.success is True
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._verify_test_dependencies')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._verify_test_dependencies')
     def test_test_validation_dependency_error(self, mock_verify):
         """Test test validation with dependency verification error"""
         mock_verify.side_effect = Exception("Dependencies not found")
@@ -600,7 +600,7 @@ class TestCodeAnalysisWorkflow:
             confidence=0.7
         )
     
-    @patch('ai_workflow_executor.AIWorkflowExecutor._execute_command')
+    @patch('tools.ai.ai_workflow_executor.AIWorkflowExecutor._execute_command')
     def test_code_analysis_workflow(self, mock_execute):
         """Test code analysis workflow execution"""
         # Mock git analysis

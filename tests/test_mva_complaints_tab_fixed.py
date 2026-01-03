@@ -2,15 +2,15 @@ import time
 
 import pytest
 from selenium.webdriver.common.by import By
-from config.config_loader import get_config
-from core import driver_manager
-from pages.login_page import LoginPage
-from pages.mva_input_page import MVAInputPage
-from utils.data_loader import load_mvas
-from utils.logger import log
-from utils.project_paths import ProjectPaths
-from utils.ui_helpers import navigate_back_to_home, is_mva_known
-from utils.test_validation import TestDataValidator
+from compass_automation.config.config_loader import get_config
+from compass_automation.core import driver_manager
+from compass_automation.pages.login_page import LoginPage
+from compass_automation.pages.mva_input_page import MVAInputPage
+from compass_automation.utils.data_loader import load_mvas
+from compass_automation.utils.logger import log
+from compass_automation.utils.project_paths import ProjectPaths
+from compass_automation.utils.ui_helpers import navigate_back_to_home, is_mva_known
+from compass_automation.utils.test_validation import TestDataValidator
 
 # Load config values
 USERNAME = get_config("username")
@@ -74,7 +74,7 @@ def test_mva_complaints_tab():
 
         time.sleep(5)
 
-        from utils.ui_helpers import is_mva_known, get_lighthouse_status
+        from compass_automation.utils.ui_helpers import is_mva_known, get_lighthouse_status
         if not is_mva_known(driver, mva):
             log.warning(f"[MVA] {mva} — invalid/unknown MVA, skipping")
             continue
@@ -86,7 +86,7 @@ def test_mva_complaints_tab():
         #     continue
 
         # Handle PM Work Items in one call
-        from flows.work_item_flow import handle_pm_workitems
+        from compass_automation.flows.work_item_flow import handle_pm_workitems
         res = handle_pm_workitems(driver, mva)
 
         if res.get("status") in ("ok", "closed"):
