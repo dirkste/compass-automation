@@ -89,10 +89,14 @@ TestDataValidator.validate_e2e_execution(require_all_mvas=True)
 
 **Expected in automation.log:**
 ```
-[INFO] [mc.automation] [timestamp] >>> Starting MVA 51299161
-[INFO] [mc.automation] [timestamp] >>> Starting MVA 54252855  
-[INFO] [mc.automation] [timestamp] >>> Starting MVA 56035512
+[HH:MM:SS][INF_MED][E2E][test_mva_complaints_tab]<>>> Starting MVA 51299161>
+[HH:MM:SS][INF_MED][E2E][test_mva_complaints_tab]<>>> Starting MVA 54252855>
+[HH:MM:SS][INF_MED][E2E][test_mva_complaints_tab]<>>> Starting MVA 56035512>
 ```
+
+Notes:
+- The validation logic typically keys off the message content (`>>> Starting MVA ...`), not the exact prefix.
+- `Source` is best set to `E2E` (either by prefixing messages with `[E2E] ...` or by using a `TwoVectorLogger(source="E2E")`).
 
 **Test Data Format (data/mva.csv):**
 ```csv

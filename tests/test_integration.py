@@ -106,7 +106,7 @@ class TestVersionCompatibility:
         with patch("compass_automation.core.driver_manager.get_browser_version", return_value="142.0.3595.65"), \
              patch("compass_automation.core.driver_manager.get_driver_version", return_value="141.0.3485.54"), \
              patch("compass_automation.core.driver_manager.os.path.exists", return_value=False), \
-             patch("compass_automation.core.driver_manager.log.warning") as mock_warn, \
+               patch("compass_automation.core.driver_manager.driver_log.warning_v") as mock_warn, \
              patch("compass_automation.core.driver_manager.webdriver.Edge") as mock_edge:
             # Ensure we don't leak a fake singleton into other tests.
             driver_manager._driver = None

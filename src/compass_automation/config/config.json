@@ -1,9 +1,12 @@
 {
-	"username": "xE96693@co.abg.com",
-	"password": "Eds12345!",
-	"login_id": "E96693",
-	"delay_seconds": 9,
-      "logging": {
+	"username": "YOUR_USERNAME",
+	"password": "YOUR_PASSWORD",
+	"login_id": "YOUR_LOGIN_ID",
+  "delay_seconds": 9,
+  "logging": {
+    "min_crit": "INFO",
+    "max_verb": "MED",
+    "file": "automation.log",
     "level": "DEBUG",
     "format": "[%(levelname)s] [mc.automation] [%(asctime)s] %(message)s"
   },

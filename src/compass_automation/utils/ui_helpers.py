@@ -6,7 +6,15 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from compass_automation.utils.logger import log
+from compass_automation.utils.logger import TwoVectorLogger, Verbosity, log
+
+
+tab_log = TwoVectorLogger(log, source="TAB")
+send_log = TwoVectorLogger(log, source="SENDTEXT")
+complaints_log = TwoVectorLogger(log, source="COMPLAINTS")
+workitems_log = TwoVectorLogger(log, source="WORKITEMS")
+artifact_log = TwoVectorLogger(log, source="ARTIFACT")
+ui_log = TwoVectorLogger(log, source="UI")
 
 
 def safe_wait(driver, timeout, condition, desc="condition"):
@@ -14,6 +22,7 @@ def safe_wait(driver, timeout, condition, desc="condition"):
     try:
         return WebDriverWait(driver, timeout).until(condition)
     except TimeoutException:
+        ui_log.error_v(Verbosity.MED, "Timeout while waiting for %s (timeout=%ss)", desc, timeout)
         msg = f"[SAFE_WAIT] Timeout while waiting for {desc}"
         # For now: all waits are required, so fail
         raise AssertionError(msg)
@@ -55,7 +64,7 @@ def click_work_items(driver, timeout: int = 10) -> bool:
 
 
 def click_complaints(driver, timeout: int = 10) -> bool:
-    log.info(f"[TAB] Attempting to click Complaints tab (timeout={timeout}s)")
+    tab_log.info_v(Verbosity.MIN, "Click Complaints tab (timeout=%ss)", timeout)
     result = _click_tab(driver, "complaints", timeout)
     if result:
         print("[TAB] Complaints tab clicked and verified as active")
@@ -92,7 +101,7 @@ def send_text(
             EC.element_to_be_clickable(locator)
         )
     except TimeoutException:
-        log.warning(f"[SENDTEXT] {label or locator} not found within {timeout}s")
+        send_log.warning_v(Verbosity.MED, "%s not found within %ss", (label or locator), timeout)
         return False
 
     try:
@@ -103,16 +112,21 @@ def send_text(
         # Verify typed value
         typed_value = element.get_attribute("value")
         if typed_value != text:
-            log.warning(
-                f"[SENDTEXT] {label or locator} mismatch -> expected '{text}', got '{typed_value}'"
+            # Atomic (FULL): include exact expected/actual values.
+            send_log.warning_v(
+                Verbosity.FULL,
+                "%s mismatch -> expected=%r got=%r",
+                (label or locator),
+                text,
+                typed_value,
             )
             return False
 
-        log.info(f"[SENDTEXT] Sent text to {label or locator}")
+        send_log.info_v(Verbosity.MIN, "Sent text to %s", (label or locator))
         return True
 
     except Exception as e:
-        log.error(f"[SENDTEXT] Exception sending text to {label or locator}: {e}")
+        send_log.error_v(Verbosity.MED, "Exception sending text to %s: %s", (label or locator), e)
         return False
 
 
@@ -152,7 +166,7 @@ def get_complaints(driver, timeout: int = 10):
         except Exception:
             pass
         items.append({"state": state, "type": ctype})
-    log.info(f"[COMPLAINTS] collected {len(items)} item(s)")
+    complaints_log.info_v(Verbosity.MIN, "Collected %s item(s)", len(items))
     return items
 
 
@@ -220,7 +234,8 @@ def debug_list_work_items(driver, timeout: int = 10):
     tiles = panel.find_elements(
         By.CSS_SELECTOR, "div[class*='scan-record__'][class*='bp6-card']"
     )
-    log.info(f"[WORKITEMS][DBG] tiles={len(tiles)}")
+    # Atomic (FULL): only emit when max_verb is FULL.
+    workitems_log.info_v(Verbosity.FULL, "tiles=%s", len(tiles))
 
     for i, t in enumerate(tiles, 1):
         try:
@@ -235,7 +250,7 @@ def debug_list_work_items(driver, timeout: int = 10):
             ).text.strip()
         except Exception:
             state = ""
-        log.info(f"  - #{i} type='{wtype}' state='{state}'")
+        workitems_log.info_v(Verbosity.FULL, "tile #%s type=%r state=%r", i, wtype, state)
 
 
  
@@ -253,7 +268,7 @@ def _dump_artifacts(driver, label: str):
             f.write(driver.page_source)
     except Exception as _:
         pass
-    log.debug(f"[ARTIFACT] saved {png} and {html}")
+    artifact_log.info_v(Verbosity.FULL, "saved %s and %s", png, html)
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait

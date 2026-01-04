@@ -6,12 +6,18 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from compass_automation.flows.complaints_flows import associate_existing_complaint
 from compass_automation.flows.finalize_flow import finalize_workitem
-from compass_automation.utils.logger import log
+from compass_automation.utils.logger import TwoVectorLogger, Verbosity, log
 from compass_automation.utils.ui_helpers import click_element, safe_wait
+
+
+work_log = TwoVectorLogger(log, source="WORKITEM")
+workitems_log = TwoVectorLogger(log, source="WORKITEMS")
+complaint_log = TwoVectorLogger(log, source="COMPLAINT")
+dialog_log = TwoVectorLogger(log, source="DIALOG")
 
 def get_work_items(driver, mva: str):
     """Collect all open PM work items for the given MVA."""
-    log.info(f"[WORKITEM] {mva} - pausing to let Work Items render...")
+    work_log.info_v(Verbosity.MED, "%s - pausing to let Work Items render...", mva)
     time.sleep(9)  # wait for UI to render
     try:
         tiles = driver.find_elements(
@@ -20,12 +26,12 @@ def get_work_items(driver, mva: str):
             "and .//div[contains(@class,'scan-record-header-title')][contains(normalize-space(),'PM')] "
             "and .//div[contains(@class,'scan-record-header-title-right__')][normalize-space()='Open']]"
         )
-        log.info(f"[WORKITEMS] {mva} - collected {len(tiles)} open PM item(s)")
+        workitems_log.info_v(Verbosity.MIN, "%s - collected %s open PM item(s)", mva, len(tiles))
         for t in tiles:
-            log.debug(f"[DBG] {mva} - tile text = {t.text!r}")
+            workitems_log.info_v(Verbosity.FULL, "%s - tile text=%r", mva, t.text)
         return tiles
     except NoSuchElementException as e:
-        log.warning(f"[WORKITEM][WARN] {mva} - could not collect work items -> {e}")
+        work_log.warning_v(Verbosity.MED, "%s - could not collect work items -> %s", mva, e)
         return []
 
 
@@ -34,39 +40,39 @@ def get_work_items(driver, mva: str):
 
 def create_new_workitem(driver, mva: str):
     """Create a new Work Item for the given MVA."""
-    log.info(f"[WORKITEM] {mva} - starting CREATE NEW WORK ITEM workflow")
+    work_log.info_v(Verbosity.MIN, "%s - starting CREATE NEW WORK ITEM workflow", mva)
 
     # Step 1: Click Add Work Item
     try:
         time.sleep(5)  # wait for button to appear
         if not click_element(driver, (By.XPATH, "//button[normalize-space()='Add Work Item']")):
-            log.warning(f"[WORKITEM][WARN] {mva} - add_btn not found")
+            work_log.warning_v(Verbosity.MED, "%s - add_btn not found", mva)
             return {"status": "failed", "reason": "add_btn", "mva": mva}
-        log.info(f"[WORKITEM] {mva} - Add Work Item clicked")
+        work_log.info_v(Verbosity.MIN, "%s - Add Work Item clicked", mva)
         time.sleep(5)
 
-    except NoSuchElementException:
-        log.warning(f"[WORKITEM][WARN] {mva} - add_btn failed -> {e}")
+    except NoSuchElementException as e:
+        work_log.warning_v(Verbosity.MED, "%s - add_btn failed -> %s", mva, e)
         return {"status": "failed", "reason": "add_btn", "mva": mva}
 
     # Step 2: Complaint handling
     try:
         res = associate_existing_complaint(driver, mva)
         if res["status"] == "associated":
-            log.info(
-                "[COMPLAINT][ASSOCIATED] {mva} - existing PM complaint linked to Work Item"
+            complaint_log.info_v(
+                Verbosity.MIN,
+                "%s - existing PM complaint linked to Work Item",
+                mva,
             )
         else:
-            log.info(
-                "[WORKITEM][SKIP] {mva} - no existing PM complaint, navigating back"
-            )
+            work_log.info_v(Verbosity.MIN, "%s - no existing PM complaint, navigating back", mva)
             return {"status": "skipped_no_complaint", "mva": mva}
     except NoSuchElementException as e:
-        log.warning(f"[WORKITEM][WARN] {mva} - complaint handling failed -> {e}")
+        work_log.warning_v(Verbosity.MED, "%s - complaint handling failed -> %s", mva, e)
         return {"status": "failed", "reason": "complaint_handling", "mva": mva}
 
     # Step 3: Finalize Work Item (call will be injected here in refactor later)
-    log.warning(f"[WORKITEM][WARN] {mva} - finalize step skipped (refactor placeholder)")
+    work_log.warning_v(Verbosity.MED, "%s - finalize step skipped (refactor placeholder)", mva)
     return {"status": "created", "mva": mva}
 
 
@@ -78,12 +84,12 @@ def handle_pm_workitems(driver, mva: str) -> dict:
          - Try to associate an existing complaint.
          - If none, skip and return control to the test loop.
     """
-    log.info(f"[WORKITEM] {mva} — handling PM work items")
+    work_log.info_v(Verbosity.MIN, "%s — handling PM work items", mva)
 
     # Step 1: check for open PM Work Items
     items = get_work_items(driver, mva)
     if items:
-        log.info(f"[WORKITEM] {mva} - open PM Work Item found, completing it")
+        work_log.info_v(Verbosity.MIN, "%s - open PM Work Item found, completing it", mva)
         from compass_automation.flows.work_item_flow import complete_pm_workitem
         return complete_pm_workitem(driver, mva)
 
@@ -91,7 +97,7 @@ def handle_pm_workitems(driver, mva: str) -> dict:
     from selenium.webdriver.common.by import By
     if click_element(driver, (By.XPATH, "//button[normalize-space()='Add Work Item']"),
                      desc="Add Work Item", timeout=8):
-        log.info(f"[WORKITEM] {mva} - Add Work Item clicked")
+        work_log.info_v(Verbosity.MIN, "%s - Add Work Item clicked", mva)
 
         # Required Action: immediately try to associate existing complaints
         from compass_automation.flows.complaints_flows import associate_existing_complaint
@@ -102,7 +108,7 @@ def handle_pm_workitems(driver, mva: str) -> dict:
             return finalize_workitem(driver, mva)
 
         elif res.get("status") == "skipped_no_complaint":
-            log.info(f"[WORKITEM] {mva} — navigating back home after skip")
+            work_log.info_v(Verbosity.MIN, "%s — navigating back home after skip", mva)
             from compass_automation.utils.ui_helpers import navigate_back_to_home
             navigate_back_to_home(driver)
             return res
@@ -110,7 +116,7 @@ def handle_pm_workitems(driver, mva: str) -> dict:
         return res
 
     else:
-        log.warning(f"[WORKITEM][WARN] {mva} - could not click Add Work Item")
+        work_log.warning_v(Verbosity.MED, "%s - could not click Add Work Item", mva)
         return {"status": "failed", "reason": "add_btn", "mva": mva}
 
 
@@ -121,15 +127,15 @@ def handle_pm_workitems(driver, mva: str) -> dict:
 
 def process_workitem(driver, mva: str):
     """Main entry point for processing a Work Item for the given MVA."""
-    log.info(f"[WORKITEM] {mva} - starting process")
+    work_log.info_v(Verbosity.MIN, "%s - starting process", mva)
 
     # Step 1: Gather existing Work Items
     tiles = get_work_items(driver, mva)
     total = len(tiles)
-    log.info(f"[WORKITEM] {mva} - {total} total work items found")
+    work_log.info_v(Verbosity.MIN, "%s - %s total work items found", mva, total)
 
     if total == 0:
-        log.info(f"[WORKITEM][SKIP] {mva} - no PM work items found")
+        work_log.info_v(Verbosity.MIN, "%s - no PM work items found", mva)
         return {"status": "skipped", "reason": "no_pm_workitems", "mva": mva}
 
     # Step 2: Handle existing Open PM Work Items
@@ -151,10 +157,10 @@ def open_pm_workitem_card(driver, mva: str, timeout: int = 8) -> dict:
             )
         )
         tile.click()
-        log.info(f"[WORKITEM] {mva} - Open PM Work Item card clicked")
+        work_log.info_v(Verbosity.MIN, "%s - Open PM Work Item card clicked", mva)
         return {"status": "ok", "reason": "card_opened", "mva": mva}
     except Exception as e:
-        log.warning(f"[WORKITEM][WARN] {mva} - could not open Open PM Work Item card -> {e}")
+        work_log.warning_v(Verbosity.MED, "%s - could not open Open PM Work Item card -> %s", mva, e)
         return {"status": "failed", "reason": "open_pm_card", "mva": mva}
 
 def complete_work_item_dialog(driver, note: str = "Done", timeout: int = 10, observe: int = 0) -> dict:
@@ -168,7 +174,7 @@ def complete_work_item_dialog(driver, note: str = "Done", timeout: int = 10, obs
             desc="Work Item dialog"
         )
 
-        log.info("[DIALOG] Correction dialog opened")
+        dialog_log.info_v(Verbosity.MIN, "Correction dialog opened")
 
         # 2) Find textarea (scoped to dialog)
         textarea = safe_wait(
@@ -183,7 +189,7 @@ def complete_work_item_dialog(driver, note: str = "Done", timeout: int = 10, obs
         time.sleep(5)
         textarea.send_keys(note)
         time.sleep(5)
-        log.info(f"[DIALOG] Entered note text: {note!r}")
+        dialog_log.info_v(Verbosity.MED, "Entered note text: %r", note)
         time.sleep(5)
 
         # 3) Click 'Complete Work Item'
@@ -196,13 +202,13 @@ def complete_work_item_dialog(driver, note: str = "Done", timeout: int = 10, obs
         time.sleep(5)
 
         complete_btn.click()
-        log.info("[DIALOG] 'Complete Work Item' button clicked")
+        dialog_log.info_v(Verbosity.MIN, "'Complete Work Item' button clicked")
     
 
         # 4) Wait for dialog to close
         safe_wait(driver ,timeout, EC.invisibility_of_element(dialog), desc="Dialog to close")    
 
-        log.info("[DIALOG] Correction dialog closed")
+        dialog_log.info_v(Verbosity.MIN, "Correction dialog closed")
 
         # The issue might be that closing the UI short after clicking the button 
         # doesn't give enough time for the backend to process the completion.
@@ -211,7 +217,7 @@ def complete_work_item_dialog(driver, note: str = "Done", timeout: int = 10, obs
 
         return {"status": "ok"}
     except Exception as e:
-        log.error(f"[DIALOG][ERROR] complete_work_item_dialog -> {e}")
+        dialog_log.error_v(Verbosity.MIN, "complete_work_item_dialog -> %s", e)
         return {"status": "failed", "reason": "dialog_exception"}
 
 
@@ -224,7 +230,7 @@ def mark_complete_pm_workitem(driver, mva: str, note: str = "Done", timeout: int
 
     time.sleep(0.2)
     res = complete_work_item_dialog(driver, note=note, timeout=max(10, timeout), observe=1)
-    log.info(f"[MARKCOMPLETE] complete_work_item_dialog -> {res}")
+    TwoVectorLogger(log, source="MARKCOMPLETE").info_v(Verbosity.MED, "complete_work_item_dialog -> %r", res)
 
     if res and res.get("status") == "ok":
         return {"status": "ok", "reason": "dialog_complete", "mva": mva}
