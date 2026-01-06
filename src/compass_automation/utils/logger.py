@@ -114,6 +114,31 @@ def _infer_source_from_message(message: str) -> Optional[str]:
     return tag
 
 
+def _strip_leading_source_tag(message: str, source: str) -> str:
+    """Remove a leading '[SOURCE]' tag from the message if it matches `source`.
+
+    This prevents duplication like: [LOGIN] ... appearing both in the [Source]
+    header and inside the angle-bracketed message payload.
+    """
+
+    if not message or not source:
+        return message
+    if not message.startswith("["):
+        return message
+    close = message.find("]")
+    if close <= 1:
+        return message
+
+    leading = message[1:close].strip()
+    if leading.upper() != str(source).strip().upper():
+        return message
+
+    remainder = message[close + 1 :]
+    if remainder.startswith(" "):
+        remainder = remainder[1:]
+    return remainder
+
+
 class TwoVectorFormatter(logging.Formatter):
     """Format logs as: [HH:MM:SS][CRIT_VERB][Source][Context] <Message>"""
 
@@ -138,6 +163,8 @@ class TwoVectorFormatter(logging.Formatter):
         if not source:
             source = _infer_source_from_message(message) or _default_source(record.name)
         context = getattr(record, "context", None) or record.funcName
+
+        message = _strip_leading_source_tag(message, source)
 
         # No spaces between brackets; message wrapped in angle brackets.
         line = f"[{time_str}][{vector}][{source}][{context}]<{message}>"
@@ -198,7 +225,9 @@ class TwoVectorLogger(logging.LoggerAdapter):
         merged_extra["verbosity"] = _normalize_verbosity(merged_extra.get("verbosity"))
         kwargs["extra"] = merged_extra
         # Ensure record.funcName points at the actual caller when using the adapter.
-        kwargs.setdefault("stacklevel", 3)
+        # logging skips frames inside the logging module automatically; stacklevel=1
+        # reliably lands on the function that called adapter.info()/warning()/... .
+        kwargs.setdefault("stacklevel", 1)
         return msg, kwargs
 
     def logv(self, level: Any, verbosity: Any, msg: str, *args: Any, **kwargs: Any) -> None:
@@ -213,10 +242,15 @@ class TwoVectorLogger(logging.LoggerAdapter):
         verbosity_norm = _normalize_verbosity(verbosity)
         if not _should_log(levelno, verbosity_norm):
             return
-        extra = kwargs.pop("extra", {}) or {}
-        extra = {**extra, "verbosity": verbosity_norm}
-        kwargs["extra"] = extra
-        kwargs.setdefault("stacklevel", 3)
+        # Merge adapter extras (e.g. source/context) with any call-site extras.
+        merged_extra: Dict[str, Any] = dict(self.extra)
+        call_extra = kwargs.pop("extra", {}) or {}
+        merged_extra.update(call_extra)
+        merged_extra["verbosity"] = verbosity_norm
+        kwargs["extra"] = merged_extra
+        # Call chain is usually: caller -> adapter.info_v/warning_v/... -> logv -> logger.log
+        # stacklevel=2 attributes the record to the original caller.
+        kwargs.setdefault("stacklevel", 2)
         self.logger.log(levelno, msg, *args, **kwargs)
 
     def info_v(self, verbosity: Any, msg: str, *args: Any, **kwargs: Any) -> None:

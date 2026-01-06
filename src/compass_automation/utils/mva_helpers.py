@@ -4,6 +4,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from compass_automation.utils.logger import log
+from compass_automation.utils.logger import TwoVectorLogger
+
+
+mva_log = TwoVectorLogger(log, source="MVA")
 
 
 def wait_for_mva_match(driver, mva, timeout=30):
@@ -23,11 +27,11 @@ def click_add_new_complaint_button(driver, timeout=15):
                 (By.XPATH, "//button[contains(., 'Add New Complaint')]")
             )
         )
-        print("Found 'Add New Complaint' button, clicking it...")
+        mva_log.info("Found 'Add New Complaint' button, clicking it...")
         Btn.click()
-        print("[DEBUG] Clicked 'Add New Complaint' button.")
+        mva_log.info("Clicked 'Add New Complaint' button.")
     except TimeoutException:
-        print("[ERROR] 'Add New Complaint' button not found or not clickable.")
+        mva_log.error("'Add New Complaint' button not found or not clickable.")
         raise
 
 
@@ -40,7 +44,7 @@ def select_pm_complaint(driver, timeout=30):
             )
         )
     except TimeoutException:
-        print("[DEBUG] No complaint tiles found within timeout.")
+        mva_log.info("No complaint tiles found within timeout.")
         return False
 
     complaint_tiles = driver.find_elements(
@@ -56,7 +60,7 @@ def select_pm_complaint(driver, timeout=30):
                 log.info(f"Selected complaint with type: {content}")
                 return True
         except Exception as e:
-            log.info(f"[DEBUG] Skipped a tile due to error: {e}")
+            mva_log.info(f"Skipped a tile due to error: {e}")
 
-    print("No 'PM' complaint found.")
+    mva_log.info("No 'PM' complaint found.")
     return False

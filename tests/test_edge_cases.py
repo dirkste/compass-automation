@@ -179,6 +179,87 @@ class TestLoggerEdgeCases:
         
         assert log.name == "mc.automation"
 
+    def test_two_vector_logger_v_methods_preserve_source(self):
+        """Ensure *_v methods keep adapter source instead of defaulting to APP."""
+        import io
+        import logging
+
+        from compass_automation.utils.logger import TwoVectorFormatter, TwoVectorLogger
+
+        stream = io.StringIO()
+        test_logger = logging.getLogger("test.two_vector_source")
+        test_logger.handlers = []
+        test_logger.filters = []
+        test_logger.setLevel(logging.DEBUG)
+        test_logger.propagate = False
+
+        handler = logging.StreamHandler(stream)
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(TwoVectorFormatter())
+        test_logger.addHandler(handler)
+
+        driver_log = TwoVectorLogger(test_logger, source="DRIVER")
+        driver_log.error_v("MED", "Test info message")
+
+        output = stream.getvalue()
+        assert "[DRIVER]" in output
+
+    def test_formatter_strips_leading_source_tag_from_message(self):
+        """Avoid duplicate metadata like [LOGIN] appearing twice."""
+        import io
+        import logging
+
+        from compass_automation.utils.logger import TwoVectorFormatter
+
+        stream = io.StringIO()
+        test_logger = logging.getLogger("test.two_vector_strip")
+        test_logger.handlers = []
+        test_logger.filters = []
+        test_logger.setLevel(logging.DEBUG)
+        test_logger.propagate = False
+
+        handler = logging.StreamHandler(stream)
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(TwoVectorFormatter())
+        test_logger.addHandler(handler)
+
+        test_logger.info("[LOGIN] Typing password")
+
+        output = stream.getvalue()
+        assert "[LOGIN]" in output
+        assert "<[LOGIN]" not in output
+        assert "<Typing password>" in output
+
+    def test_two_vector_logger_context_points_to_immediate_caller(self):
+        """Context should be the function that called adapter.info()."""
+        import io
+        import logging
+
+        from compass_automation.utils.logger import TwoVectorFormatter, TwoVectorLogger
+
+        stream = io.StringIO()
+        test_logger = logging.getLogger("test.two_vector_context")
+        test_logger.handlers = []
+        test_logger.filters = []
+        test_logger.setLevel(logging.DEBUG)
+        test_logger.propagate = False
+
+        handler = logging.StreamHandler(stream)
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(TwoVectorFormatter())
+        test_logger.addHandler(handler)
+
+        adapter = TwoVectorLogger(test_logger, source="TEST")
+
+        def inner_call():
+            adapter.info("hello")
+
+        inner_call()
+
+        output = stream.getvalue()
+        assert "[TEST]" in output
+        assert "[inner_call]" in output
+
 
 class TestDataIntegrity:
     """Test data integrity and validation."""

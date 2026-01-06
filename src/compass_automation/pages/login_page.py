@@ -9,8 +9,49 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from compass_automation.core.navigator import Navigator
 from compass_automation.utils.project_paths import ProjectPaths
-from compass_automation.utils.logger import log
-from compass_automation.utils.ui_helpers import click_element, safe_wait, send_text
+from compass_automation.utils.logger import TwoVectorLogger, log
+from compass_automation.utils.ui_helpers import click_and_expect, safe_wait, send_text, wait_for_any
+
+
+login_log = TwoVectorLogger(log, source="LOGIN")
+
+
+_LOGIN_BLOCKERS = [
+    {
+        "reason": "unexpected_account_picker",
+        "locator": (
+            By.XPATH,
+            "//*[contains(normalize-space(),'Pick an account') or contains(normalize-space(),'Use another account')]",
+        ),
+        "mode": "visible",
+    },
+    {
+        "reason": "unexpected_mfa_required",
+        "locator": (
+            By.XPATH,
+            "//*[contains(normalize-space(),'Approve sign in request') or contains(normalize-space(),'Enter code') or contains(normalize-space(),'verification')]",
+        ),
+        "mode": "visible",
+    },
+    {
+        "reason": "unexpected_mfa_required",
+        "locator": (By.NAME, "otc"),
+        "mode": "present",
+    },
+    {
+        "reason": "unexpected_consent_required",
+        "locator": (
+            By.XPATH,
+            "//*[contains(normalize-space(),'Permissions requested') or contains(normalize-space(),'Need admin approval') or contains(normalize-space(),'consent')]",
+        ),
+        "mode": "visible",
+    },
+    {
+        "reason": "unexpected_conditional_access",
+        "locator": (By.XPATH, "//*[contains(normalize-space(),'More information required')]"),
+        "mode": "visible",
+    },
+]
 
 
 class LoginPage:
@@ -26,7 +67,7 @@ class LoginPage:
     def is_logged_in(self):
         """Check if Compass Mobile session is already authenticated."""
         
-        log.info(f"[DEBUG] inside is_logged_in")
+        login_log.info("inside is_logged_in")
         elems = self.driver.find_elements(By.XPATH, "//span[contains(text(),'Compass Mobile')]")
         return len(elems) > 0
 
@@ -37,10 +78,10 @@ class LoginPage:
         )
 
         if self.is_logged_in():
-            log.info("[LOGIN] Session already authenticated - reusing it.")
+            login_log.info("Session already authenticated - reusing it.")
             return {"status": "ok"}
         else:
-            log.info("[LOGIN] No active session - performing login()...")
+            login_log.info("No active session - performing login()...")
             return self.login(username, password, login_id)
 
     def enter_wwid(self, login_id: str):
@@ -56,7 +97,7 @@ class LoginPage:
             )
 
         except TimeoutException:
-            log.warning(f"[LOGIN][WARN] Timed out waiting for WWID field")
+            login_log.warning("Timed out waiting for WWID field")
             return {"status": "failed", "reason": "wwid_field_timeout"}
 
         try:
@@ -68,88 +109,153 @@ class LoginPage:
             ):
                 return {"status": "failed", "reason": "wwid_entry_failed"}
 
-            # Press Enter (special key -> keep raw)
-            self.driver.find_element(
-                By.CSS_SELECTOR, "input[class*='fleet-operations-pwa__text-input__']"
+            submit_res = click_and_expect(
+                self.driver,
+                (By.XPATH, "//button[.//span[normalize-space()='Submit']]") ,
+                click_desc="WWID submit",
+                expectations=[
+                    {
+                        "name": "mva_home",
+                        "locator": (By.XPATH, "//button[contains(@class,'fleet-operations-pwa__camera-button')]"),
+                        "mode": "present",
+                    }
+                ],
+                blockers=_LOGIN_BLOCKERS,
+                timeout_click=10,
+                timeout_expect=20,
+                label="post_wwid_submit",
             )
-            if not click_element(self.driver, (By.XPATH, "//button[.//span[normalize-space()='Submit']]")):
-                log.warning(f"[LOGIN][WARN] Could not click WWID submit button")
-                return {"status": "failed", "reason": "wwid_submit_failed"}
-            log.info(f"[LOGIN] WWID submitted via button")
+            if submit_res.get("status") != "ok":
+                login_log.warning(f"WWID submit did not transition: {submit_res}")
+                return {"status": "failed", "reason": "wwid_submit_no_transition"}
+
+            login_log.info("WWID submit -> home screen detected")
             return {"status": "ok"}
             # time.sleep(5)
 
 
         except Exception as e:
-            log.error(f"[LOGIN][ERROR] Unexpected error entering WWID: {e}")
+            login_log.error(f"Unexpected error entering WWID: {e}")
             return {"status": "failed", "reason": "exception"}
 
     def login(self, username: str, password: str, login_id: str):
         """Perform login flow: email -> password -> stay signed in"""
         # Navigation via Navigator (SRP)
         
-        log.info(f"[DEBUG] inside login()")
+        login_log.info("inside login()")
         Navigator(self.driver).go_to(
-            "https://avisbudget.palantirfoundry.com/multipass/login", label="Login page"
+            "https://avisbudget.palantirfoundry.com/multipass/login", label="Login page", verify=False
         )
+
+        # Evidence that the login form exists before we attempt any actions.
+        nav_check = Navigator(self.driver).verify(check_locator=(By.NAME, "loginfmt"), timeout=15)
+        if nav_check.get("status") != "ok":
+            login_log.warning(f"Login page not ready for input: {nav_check}")
+            return {"status": "failed", "reason": "login_page_not_ready"}
 
         # --- Email ---
-        email_field = safe_wait(
+        if not send_text(
             self.driver,
-            10,
-            EC.presence_of_element_located((By.NAME, "loginfmt")),
-            "email_field",
+            (By.NAME, "loginfmt"),
+            username,
+            timeout=10,
+            clear=True,
+            validate=True,
+            label="email_field",
+        ):
+            login_log.warning("Failed to enter email (field not clickable or did not accept input)")
+            return {"status": "failed", "reason": "email_entry_failed"}
+
+
+        login_log.info("Email entered")
+
+        # Click Next button to proceed to password
+        next_res = click_and_expect(
+            self.driver,
+            (By.ID, "idSIButton9"),
+            click_desc="Next after email",
+            expectations=[
+                {"name": "password_field", "locator": (By.NAME, "passwd"), "mode": "present"},
+            ],
+            blockers=_LOGIN_BLOCKERS,
+            timeout_expect=15,
+            label="post_next_after_email",
         )
-        if not email_field:
-            log.warning(f"[LOGIN] Email field not found (timeout)")
-            return {"status": "failed", "reason": "timeout_email_field"}
+        if next_res.get("status") != "ok":
+            login_log.warning(f"Next after email did not transition: {next_res}")
+            return {"status": "failed", "reason": "login_transition_missing_password_field"}
 
-        log.info(f"[LOGIN] Typing email: {username}")
-        email_field.send_keys(username)
-
-        ## Click Next button to proceed to password
-        log.info(f"[LOGIN] Clicking Next button after email")
-
-        if not click_element(self.driver, (By.ID, "idSIButton9")):            
-            return {"status": "failed", "reason": "timeout_next_button"}
+        login_log.info("Next after email -> password step detected")
         # --- Password ---
-        password_field = safe_wait(
+        if not send_text(
             self.driver,
-            10,
-            EC.presence_of_element_located((By.NAME, "passwd")),
-            "password_field",
+            (By.NAME, "passwd"),
+            password,
+            timeout=10,
+            clear=True,
+            validate=False,
+            label="password_field",
+        ):
+            login_log.warning("Failed to enter password (field not clickable or did not accept input)")
+            return {"status": "failed", "reason": "password_entry_failed"}
+
+        login_log.info("Password entered")
+
+        signin_res = click_and_expect(
+            self.driver,
+            (By.ID, "idSIButton9"),
+            click_desc="Sign in button",
+            expectations=[
+                # Expected: KMSI prompt OR redirect to app shell.
+                {"name": "kmsi_prompt", "locator": (By.ID, "idBtn_Back"), "mode": "clickable"},
+                {
+                    "name": "app_shell",
+                    "locator": (By.XPATH, "//span[contains(text(),'Compass Mobile')]|//a[@role='button']//span[normalize-space()='Compass Mobile']"),
+                    "mode": "present",
+                },
+            ],
+            blockers=_LOGIN_BLOCKERS,
+            timeout_expect=20,
+            label="post_signin",
         )
+        if signin_res.get("status") != "ok":
+            login_log.warning(f"Sign in did not reach expected state: {signin_res}")
+            return {"status": "failed", "reason": "login_post_signin_no_transition"}
 
-        
-
-        if not password_field:
-            log.warning(f"[LOGIN] Password field not found (timeout)")
-            return {"status": "failed", "reason": "timeout_password_field"}
-
-        log.info(f"[LOGIN] Typing password")
-        password_field.send_keys(password)
-        log.info(f"[LOGIN] Password entered")
-
-        log.info("[LOGIN] Clicking Sign in after password")
-        if not click_element(self.driver, (By.ID, "idSIButton9"), desc="Sign in button"):
-            return {"status": "failed", "reason": "click_password_next"}
-
-        log.info(f"[LOGIN] Clicked Sign in appears to have worked")
-        time.sleep(2)
+        login_log.info(f"Sign in -> matched {signin_res.get('matched')}")
 
         # --- Stay signed in? ---
-        no_btn = safe_wait(
-            self.driver,
-            3,
-            EC.element_to_be_clickable((By.ID, "idBtn_Back")),
-            "stay_signed_in_no",
-        )
-        if no_btn:
-            log.info(f"[LOGIN] Dismissing 'Stay signed in?' dialog with No")
+        if signin_res.get("matched") == "kmsi_prompt":
+            no_btn = safe_wait(
+                self.driver,
+                6,
+                EC.element_to_be_clickable((By.ID, "idBtn_Back")),
+                "stay_signed_in_no",
+            )
+            login_log.info("Dismissing 'Stay signed in?' dialog with No")
             no_btn.click()
-            time.sleep(1)
+
+            post_kmsi = wait_for_any(
+                self.driver,
+                expectations=[
+                    {
+                        "name": "app_shell",
+                        "locator": (
+                            By.XPATH,
+                            "//span[contains(text(),'Compass Mobile')]|//a[@role='button']//span[normalize-space()='Compass Mobile']",
+                        ),
+                        "mode": "present",
+                    }
+                ],
+                blockers=_LOGIN_BLOCKERS,
+                timeout=20,
+                label="post_kmsi_no",
+            )
+            if post_kmsi.get("status") != "ok":
+                login_log.warning(f"KMSI dismissed but app shell not detected: {post_kmsi}")
+                return {"status": "failed", "reason": "login_post_kmsi_no_transition"}
         else:
-            log.info(f"[LOGIN] 'Stay signed in?' dialog not shown")
+            login_log.info("KMSI prompt not shown")
 
         return {"status": "ok"}
 
@@ -168,13 +274,13 @@ class LoginPage:
         )
 
         if not mobile_btn:
-            log.warning(f"[LOGIN][WARN] Compass Mobile button not found")
+            login_log.warning("Compass Mobile button not found")
             return {"status": "failed", "reason": "compass_mobile_button_missing"}
 
         # Save current tab count
         prev_tabs = len(self.driver.window_handles)
 
-        log.info(f"[LOGIN] Clicking Compass Mobile button")
+        login_log.info("Clicking Compass Mobile button")
         mobile_btn.click()
 
         safe_wait(
@@ -188,14 +294,12 @@ class LoginPage:
         # Confirm new tab appeared
         curr_tabs = len(self.driver.window_handles)
         if curr_tabs <= prev_tabs:
-            log.warning(
-                "[LOGIN][WARN] No new tab detected after clicking Compass Mobile"
-            )
+            login_log.warning("No new tab detected after clicking Compass Mobile")
             return {"status": "failed", "reason": "no_new_tab"}
 
         # Switch to newest tab
         self.driver.switch_to.window(self.driver.window_handles[-1])
-        log.info(f"[LOGIN] Switched to Compass Mobile tab")
+        login_log.info("Switched to Compass Mobile tab")
 
         # Verify WWID field exists
         wwid_field = safe_wait(
@@ -207,17 +311,15 @@ class LoginPage:
             "wwid_input_field",
         )
         if not wwid_field:
-            log.warning(
-                "[LOGIN][WARN] WWID input not found after Compass Mobile launch"
-            )
+            login_log.warning("WWID input not found after Compass Mobile launch")
             return {"status": "failed", "reason": "wwid_field_missing"}
 
-        log.info(f"[LOGIN] WWID input field detected")
+        login_log.info("WWID input field detected")
         return {"status": "ok"}
 
     def ensure_user_context(self, login_id: str):
         """Ensure WWID is entered once Compass Mobile is loaded."""
-        log.info(f"[LOGIN] Proceeding to WWID entry")
+        login_log.info("Proceeding to WWID entry")
         return self.enter_wwid(login_id)
 
     def ensure_ready(self, username: str, password: str, login_id: str):
@@ -227,10 +329,10 @@ class LoginPage:
         2) go_to_mobile_home
         3) ensure_user_context(WWID)
         """
-        log.info(f"[DEBUG] before ensure_logged_in")
+        login_log.info("before ensure_logged_in")
 
         res = self.ensure_logged_in(username, password, login_id)
-        log.debug(f"[LOGIN] ensure_logged_in -> {res}")
+        login_log.debug(f"ensure_logged_in -> {res}")
         time.sleep(self.delay_seconds)
         if res["status"] != "ok":
             return res

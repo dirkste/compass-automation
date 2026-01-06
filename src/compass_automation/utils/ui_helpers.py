@@ -1,7 +1,7 @@
 # utils/ui_helpers.py
 import os
 import time
-from typing import Optional
+from typing import Optional, Iterable, Dict, Any
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -15,6 +15,180 @@ complaints_log = TwoVectorLogger(log, source="COMPLAINTS")
 workitems_log = TwoVectorLogger(log, source="WORKITEMS")
 artifact_log = TwoVectorLogger(log, source="ARTIFACT")
 ui_log = TwoVectorLogger(log, source="UI")
+click_log = TwoVectorLogger(log, source="CLICK")
+wait_log = TwoVectorLogger(log, source="WAIT")
+
+
+def _page_state(driver) -> tuple[str, str]:
+    """Best-effort (url, title) for diagnostic logging."""
+    try:
+        url = driver.current_url
+    except Exception:
+        url = ""
+    try:
+        title = driver.title
+    except Exception:
+        title = ""
+    return url, title
+
+
+def _locator_present(driver, locator: tuple) -> bool:
+    try:
+        return len(driver.find_elements(*locator)) > 0
+    except Exception:
+        return False
+
+
+def _locator_visible(driver, locator: tuple) -> bool:
+    try:
+        els = driver.find_elements(*locator)
+        return any(e.is_displayed() for e in els)
+    except Exception:
+        return False
+
+
+def _locator_clickable(driver, locator: tuple) -> bool:
+    try:
+        els = driver.find_elements(*locator)
+        for e in els:
+            try:
+                if e.is_displayed() and e.is_enabled():
+                    return True
+            except Exception:
+                continue
+        return False
+    except Exception:
+        return False
+
+
+def _matches(driver, locator: tuple, mode: str) -> bool:
+    mode_norm = (mode or "present").strip().lower()
+    if mode_norm == "present":
+        return _locator_present(driver, locator)
+    if mode_norm == "visible":
+        return _locator_visible(driver, locator)
+    if mode_norm == "clickable":
+        return _locator_clickable(driver, locator)
+    # default: presence
+    return _locator_present(driver, locator)
+
+
+def wait_for_any(
+    driver,
+    expectations: Iterable[Dict[str, Any]],
+    *,
+    timeout: float = 10,
+    poll: float = 0.25,
+    blockers: Optional[Iterable[Dict[str, Any]]] = None,
+    label: str = "",
+) -> Dict[str, Any]:
+    """Wait until any expected state is detected, or a blocker is detected.
+
+    This is intentionally non-throwing: it returns a structured result so callers
+    can fail the current iteration cleanly.
+
+    expectations: [{'name': str, 'locator': (By, value), 'mode': 'present'|'visible'|'clickable'}]
+    blockers:     [{'reason': str, 'locator': (By, value), 'mode': ...}]
+    """
+
+    end = time.monotonic() + float(timeout)
+    page_url, page_title = _page_state(driver)
+
+    exp_names = [str(e.get("name")) for e in expectations if e.get("name")]
+    wait_log.info_v(
+        Verbosity.FULL,
+        "wait_for_any start label=%r timeout=%ss url=%s title=%r expectations=%s",
+        label,
+        timeout,
+        page_url,
+        page_title,
+        exp_names,
+    )
+
+    blockers_list = list(blockers or [])
+    expectations_list = list(expectations)
+
+    while time.monotonic() < end:
+        # Blockers first: strict scripted flow should fail fast.
+        for b in blockers_list:
+            locator = b.get("locator")
+            if not locator:
+                continue
+            if _matches(driver, locator, b.get("mode", "present")):
+                page_url, page_title = _page_state(driver)
+                reason = str(b.get("reason") or "blocked")
+                wait_log.warning_v(
+                    Verbosity.MED,
+                    "wait_for_any blocker=%s label=%r url=%s title=%r",
+                    reason,
+                    label,
+                    page_url,
+                    page_title,
+                )
+                return {"status": "failed", "reason": reason, "matched": reason}
+
+        for e in expectations_list:
+            locator = e.get("locator")
+            if not locator:
+                continue
+            if _matches(driver, locator, e.get("mode", "present")):
+                matched = str(e.get("name") or locator)
+                page_url, page_title = _page_state(driver)
+                wait_log.info_v(
+                    Verbosity.MIN,
+                    "wait_for_any matched=%s label=%r url=%s",
+                    matched,
+                    label,
+                    page_url,
+                )
+                return {"status": "ok", "matched": matched}
+
+        time.sleep(float(poll))
+
+    page_url, page_title = _page_state(driver)
+    wait_log.warning_v(
+        Verbosity.MED,
+        "wait_for_any timeout label=%r url=%s title=%r expectations=%s",
+        label,
+        page_url,
+        page_title,
+        exp_names,
+    )
+    return {"status": "failed", "reason": "timeout", "matched": None, "expected": exp_names}
+
+
+def click_and_expect(
+    driver,
+    click_locator: tuple,
+    *,
+    click_desc: str,
+    expectations: Iterable[Dict[str, Any]],
+    timeout_click: int = 8,
+    timeout_expect: float = 10,
+    blockers: Optional[Iterable[Dict[str, Any]]] = None,
+    label: str = "",
+) -> Dict[str, Any]:
+    """Click an element and then strictly verify the expected next UI state."""
+
+    if not click_element(driver, click_locator, desc=click_desc, timeout=timeout_click):
+        page_url, page_title = _page_state(driver)
+        wait_log.warning_v(
+            Verbosity.MED,
+            "click_and_expect click_failed desc=%r label=%r url=%s title=%r",
+            click_desc,
+            label,
+            page_url,
+            page_title,
+        )
+        return {"status": "failed", "reason": "click_failed", "matched": None}
+
+    return wait_for_any(
+        driver,
+        expectations,
+        timeout=timeout_expect,
+        blockers=blockers,
+        label=(label or click_desc),
+    )
 
 
 def safe_wait(driver, timeout, condition, desc="condition"):
@@ -79,6 +253,7 @@ def send_text(
     text: str,
     timeout: int = 10,
     clear: bool = True,
+    validate: bool = True,
     label: str = "",
 ) -> bool:
     """
@@ -95,32 +270,61 @@ def send_text(
     Returns:
         bool: True if successful, False otherwise
     """
+    page_url, page_title = _page_state(driver)
+    # FULL: emit rich diagnostics only when max_verb=FULL.
+    send_log.info_v(
+        Verbosity.FULL,
+        "Waiting for %s clickable (timeout=%ss) url=%s title=%r locator=%s",
+        (label or locator),
+        timeout,
+        page_url,
+        page_title,
+        locator,
+    )
+
     try:
         # Wait until element is interactable
         element = WebDriverWait(driver, timeout).until(
             EC.element_to_be_clickable(locator)
         )
     except TimeoutException:
-        send_log.warning_v(Verbosity.MED, "%s not found within %ss", (label or locator), timeout)
+        page_url, page_title = _page_state(driver)
+        send_log.warning_v(
+            Verbosity.MED,
+            "%s not clickable within %ss (url=%s title=%r)",
+            (label or locator),
+            timeout,
+            page_url,
+            page_title,
+        )
         return False
 
     try:
+        # Evidence-based (MIN): we found an interactable element.
+        send_log.info_v(
+            Verbosity.MIN,
+            "Found %s clickable (displayed=%s enabled=%s)",
+            (label or locator),
+            element.is_displayed(),
+            element.is_enabled(),
+        )
         if clear:
             element.clear()
         element.send_keys(text)
 
-        # Verify typed value
-        typed_value = element.get_attribute("value")
-        if typed_value != text:
-            # Atomic (FULL): include exact expected/actual values.
-            send_log.warning_v(
-                Verbosity.FULL,
-                "%s mismatch -> expected=%r got=%r",
-                (label or locator),
-                text,
-                typed_value,
-            )
-            return False
+        if validate:
+            # Verify typed value
+            typed_value = element.get_attribute("value")
+            if typed_value != text:
+                # Atomic (FULL): include exact expected/actual values.
+                send_log.warning_v(
+                    Verbosity.FULL,
+                    "%s mismatch -> expected=%r got=%r",
+                    (label or locator),
+                    text,
+                    typed_value,
+                )
+                return False
 
         send_log.info_v(Verbosity.MIN, "Sent text to %s", (label or locator))
         return True
@@ -369,18 +573,6 @@ def get_lighthouse_status(driver, mva: str, timeout: int = 8) -> Optional[str]:
 
 
 
-from selenium.common.exceptions import StaleElementReferenceException
-
-def is_stale(element) -> bool:
-    try:
-        # Calling .is_enabled() or .tag_name forces a round-trip to the DOM
-        element.is_enabled()
-        return False
-    except StaleElementReferenceException:
-        return True
-
-
-
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 
 def is_stale(element) -> bool:
@@ -393,29 +585,57 @@ def is_stale(element) -> bool:
 
 
 def click_element(driver, locator: tuple, desc: str = "element", timeout: int = 8) -> bool:
-    """Find and click an element with a single retry if stale."""
-    log.debug(f"[CLICK] attempting to click {locator} ({desc})")
+    """Find and click an element with a small retry budget.
+
+    Handles staleness both during the wait phase (element re-renders) and during click.
+    """
+    page_url, page_title = _page_state(driver)
+    click_log.info_v(
+        Verbosity.FULL,
+        "Waiting for %s clickable (timeout=%ss) url=%s title=%r locator=%s",
+        desc,
+        timeout,
+        page_url,
+        page_title,
+        locator,
+    )
     try:
-        el = WebDriverWait(driver, timeout).until(
-            EC.element_to_be_clickable(locator)
-        )
-        try:
-            el.click()
-            log.debug(f"[CLICK] clicked {locator} ({desc})")
-            return True
-        except StaleElementReferenceException:
-            log.warning(f"[CLICK][WARN] stale element -> retrying {locator} ({desc})")
-            el = WebDriverWait(driver, timeout).until(
-                EC.element_to_be_clickable(locator)
-            )
-            el.click()
-            log.debug(f"[CLICK] clicked after retry {locator} ({desc})")
-            return True
-    except TimeoutException:
-        log.warning(f"[CLICK][WARN] timeout waiting for {locator} ({desc})")
+        for attempt in range(2):
+            try:
+                el = WebDriverWait(
+                    driver,
+                    timeout,
+                    ignored_exceptions=(StaleElementReferenceException,),
+                ).until(EC.element_to_be_clickable(locator))
+                click_log.info_v(
+                    Verbosity.MIN,
+                    "Found %s clickable (displayed=%s enabled=%s)",
+                    desc,
+                    el.is_displayed(),
+                    el.is_enabled(),
+                )
+                el.click()
+                click_log.info_v(Verbosity.MIN, "Clicked %s", desc)
+                if attempt:
+                    click_log.info_v(Verbosity.FULL, "Clicked after retry (attempt=%s)", attempt + 1)
+                return True
+            except StaleElementReferenceException:
+                click_log.warning_v(Verbosity.MED, "Stale element -> retrying %s", desc)
+                continue
         return False
-    except Exception as e:
-        log.exception(f"[CLICK][ERR] could not click {locator} ({desc})")
+    except TimeoutException:
+        page_url, page_title = _page_state(driver)
+        click_log.warning_v(
+            Verbosity.MED,
+            "Timeout waiting for %s clickable (timeout=%ss url=%s title=%r)",
+            desc,
+            timeout,
+            page_url,
+            page_title,
+        )
+        return False
+    except Exception:
+        click_log.error_v(Verbosity.MED, "Could not click %s", desc)
         return False
 
 
@@ -775,5 +995,5 @@ def take_screenshot(driver, prefix="screenshot"):
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
     driver.save_screenshot(path)
-    log.info(f"[DEBUG] Screenshot saved -> {path}")
+    ui_log.info(f"Screenshot saved -> {path}")
     return path

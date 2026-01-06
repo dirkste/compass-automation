@@ -21,13 +21,25 @@ _driver = None  # singleton instance
 
 def get_browser_version() -> str:
     """Return installed Edge browser version from Windows registry."""
-    try:
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Edge\BLBeacon")
-        value, _ = winreg.QueryValueEx(key, "version")
-        return value
-    except Exception as e:
-        driver_log.error_v(Verbosity.MED, "Failed to read Edge browser version: %s", e)
-        return "unknown"
+    key_candidates = [
+        (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Edge\BLBeacon"),
+        (winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Edge\BLBeacon"),
+        (winreg.HKEY_LOCAL_MACHINE, r"Software\WOW6432Node\Microsoft\Edge\BLBeacon"),
+    ]
+
+    last_error: Exception | None = None
+    for root, subkey in key_candidates:
+        try:
+            key = winreg.OpenKey(root, subkey)
+            value, _ = winreg.QueryValueEx(key, "version")
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        except Exception as e:
+            last_error = e
+            continue
+
+    driver_log.error_v(Verbosity.MED, "Failed to read Edge browser version: %s", last_error)
+    return "unknown"
 
 
 
@@ -41,11 +53,24 @@ def get_browser_version() -> str:
 def get_driver_version(driver_path: str) -> str:
     """Return Edge WebDriver version (e.g., 140.0.x.x)."""
     if not os.path.exists(driver_path):
-        driver_log.error_v(Verbosity.MIN, "Driver binary not found at %s", driver_path)
+        driver_log.warning_v(
+            Verbosity.MIN,
+            "Driver binary not found at %s (will use Selenium Manager if needed)",
+            driver_path,
+        )
         return "unknown"
     try:
         output = subprocess.check_output([driver_path, "--version"], text=True)
-        return re.search(r"(\d+\.\d+\.\d+\.\d+)", output).group(1)
+        match = re.search(r"(\d+\.\d+\.\d+\.\d+)", output or "")
+        if not match:
+            driver_log.error_v(
+                Verbosity.MED,
+                "Failed to get driver version from %s: unrecognized output '%s'",
+                driver_path,
+                (output or "").strip(),
+            )
+            return "unknown"
+        return match.group(1)
     except Exception as e:
         driver_log.error_v(Verbosity.MED, "Failed to get driver version from %s: %s", driver_path, e)
         return "unknown"
@@ -63,16 +88,22 @@ def get_or_create_driver():
     # Always log detected versions
     driver_log.info_v(Verbosity.MIN, "Detected Browser=%s, Driver=%s", browser_ver, driver_ver)
 
-    # Compare before launching browser
-    if browser_ver.split(".")[0] != driver_ver.split(".")[0]:
-        driver_log.warning_v(
-            Verbosity.MED,
-            "Version mismatch → Browser %s, Driver %s. Proceeding with caution. Run 'python manage_driver.py --download' to update.",
-            browser_ver,
-            driver_ver,
+    # Compare before launching browser (only when we have an actual local driver version).
+    if driver_ver == "unknown":
+        driver_log.info_v(
+            Verbosity.MIN,
+            "Driver version unknown (no local msedgedriver.exe); Selenium Manager may be used",
         )
     else:
-        driver_log.info_v(Verbosity.MIN, "Versions match")
+        if browser_ver.split(".")[0] != driver_ver.split(".")[0]:
+            driver_log.warning_v(
+                Verbosity.MED,
+                "Version mismatch → Browser %s, Driver %s. Proceeding with caution. Run 'python manage_driver.py --download' to update.",
+                browser_ver,
+                driver_ver,
+            )
+        else:
+            driver_log.info_v(Verbosity.MIN, "Versions match")
 
     try:
         driver_log.info_v(Verbosity.MIN, "Launching Edge → Browser %s, Driver %s", browser_ver, driver_ver)
