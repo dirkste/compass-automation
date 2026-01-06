@@ -31,6 +31,11 @@ Thumbs.db
 tests/test_sanity_launch.py
 validation_report.md
 
+# Local secrets (do not commit)
+src/compass_automation/config/config.local.json
+.env
+.env.*
+
 # Drivers
 msedgedriver.exe
 chromedriver.exe
