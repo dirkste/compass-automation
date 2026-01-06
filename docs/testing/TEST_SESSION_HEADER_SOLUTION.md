@@ -8,6 +8,11 @@
 ## Solution Implemented
 
 ### 1. **Clear Test Session Header Added** 🎯
+
+**Note (2026-01)**: The project now uses a Two-Vector logger line format. The important part for session isolation is still the *marker text* (e.g. `🚀 E2E TEST SESSION STARTED`), but the line prefix will look like:
+
+`[HH:MM:SS][INF_MED][E2E][test_mva_complaints_tab]<...>`
+
 ```
 [INFO] [mc.automation] [18:15:14] ================================================================================
 [INFO] [mc.automation] [18:15:14] 🚀 E2E TEST SESSION STARTED

@@ -1,13 +1,23 @@
 {
-	"username": "xE96693@co.abg.com",
-	"password": "Eds12345!",
-	"login_id": "E96693",
-	"delay_seconds": 9,
-      "logging": {
-    "level": "DEBUG",
-    "format": "[%(levelname)s] [mc.automation] [%(asctime)s] %(message)s"
+  "_comment": "This file is JSON (no native comments). Explanations are stored in _comment* fields.",
+  "_comment_credentials": "Set these to your real Compass credentials (do not commit secrets).",
+	"username": "YOUR_USERNAME",
+	"password": "YOUR_PASSWORD",
+	"login_id": "YOUR_LOGIN_ID",
+  "_comment_delay_seconds": "Default UI delay/timeout used by some flows (seconds).",
+  "delay_seconds": 9,
+  "logging": {
+    "_comment": "Two-Vector logging = (min criticality floor) AND (max verbosity ceiling).",
+    "_comment_min_crit": "Minimum criticality to emit. Typical: INFO, WARNING, ERROR, CRITICAL. Records below this are dropped.",
+    "min_crit": "INFO",
+    "_comment_max_verb": "Maximum verbosity to emit: MIN (surface), MED (structure), FULL (atomic). Records above this are dropped.",
+    "max_verb": "MIN",
+    "_comment_file": "Log file path. The Two-Vector logger writes both to console and this file.",
+    "file": "automation.log",
+    "_comment_legacy": "Legacy keys like logging.level/logging.format are no longer used by the Two-Vector logger and have been removed to avoid confusion."
   },
   "performance": {
+    "_comment": "Used by performance tooling/benchmarks.",
     "config_threshold": 0.1,
     "object_creation_threshold": 0.01
   }

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.request import urlopen
 
-from compass_automation.utils.logger import log
+from compass_automation.utils.logger import TwoVectorLogger, Verbosity, log
 
 
 from compass_automation.utils.project_paths import ProjectPaths
@@ -40,7 +40,11 @@ class DriverDownloader:
             value, _ = winreg.QueryValueEx(key, "version")
             return value
         except Exception as e:
-            log.error(f"[DRIVER] Failed to get browser version from registry: {e}")
+            TwoVectorLogger(log, source="DRIVER").error_v(
+                Verbosity.MED,
+                "Failed to get browser version from registry: %s",
+                e,
+            )
             return "unknown"
 
     @staticmethod
@@ -59,7 +63,11 @@ class DriverDownloader:
                 return match.group(1)
             return "unknown"
         except Exception as e:
-            log.error(f"[DRIVER] Failed to extract driver version: {e}")
+            TwoVectorLogger(log, source="DRIVER").error_v(
+                Verbosity.MED,
+                "Failed to extract driver version: %s",
+                e,
+            )
             return "unknown"
 
     @staticmethod
@@ -77,8 +85,9 @@ class DriverDownloader:
         import socket
         
         try:
+            driver_log = TwoVectorLogger(log, source="DRIVER")
             url = DriverDownloader.DRIVER_DOWNLOAD_URL.format(version=version)
-            log.info(f"[DRIVER] Downloading driver v{version} from {url}")
+            driver_log.info_v(Verbosity.MIN, "Downloading driver v%s from %s", version, url)
 
             # Create temp directory for extraction
             temp_dir = target_path.parent / ".driver_temp"
@@ -86,7 +95,7 @@ class DriverDownloader:
 
             # Download zip file with retry logic
             zip_path = temp_dir / "msedgedriver.zip"
-            log.info(f"[DRIVER] Downloading to {zip_path}")
+            driver_log.info_v(Verbosity.MED, "Downloading to %s", zip_path)
 
             max_retries = 3
             retry_count = 0
@@ -103,14 +112,17 @@ class DriverDownloader:
                     if retry_count < max_retries:
                         wait_time = 2 ** retry_count  # Exponential backoff
                         log.warning(
-                            f"[DRIVER] Network error (attempt {retry_count}/{max_retries}): {net_error}. "
-                            f"Retrying in {wait_time} seconds..."
+                            "Network error (attempt %s/%s): %s. Retrying in %s seconds...",
+                            retry_count,
+                            max_retries,
+                            net_error,
+                            wait_time,
                         )
                         time.sleep(wait_time)
                     else:
                         raise
 
-            log.info(f"[DRIVER] Download complete, extracting...")
+            driver_log.info_v(Verbosity.MIN, "Download complete, extracting...")
 
             # Extract the driver
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
@@ -127,27 +139,29 @@ class DriverDownloader:
                             backup_path = target_path.with_stem(
                                 f"{target_path.stem}_backup"
                             )
-                            log.info(f"[DRIVER] Backing up existing driver to {backup_path}")
+                            driver_log.info_v(Verbosity.MED, "Backing up existing driver to %s", backup_path)
                             shutil.copy2(target_path, backup_path)
 
                         # Move extracted driver to target location
                         shutil.move(str(extracted_driver), str(target_path))
-                        log.info(f"[DRIVER] Driver installed to {target_path}")
+                        driver_log.info_v(Verbosity.MIN, "Driver installed to %s", target_path)
 
                         # Cleanup temp directory
                         shutil.rmtree(temp_dir, ignore_errors=True)
 
                         return True
 
-            log.error("[DRIVER] msedgedriver.exe not found in downloaded zip")
+            driver_log.error_v(Verbosity.MIN, "msedgedriver.exe not found in downloaded zip")
             return False
 
         except Exception as e:
-            log.error(f"[DRIVER] Download failed: {e}")
+            driver_log = TwoVectorLogger(log, source="DRIVER")
+            driver_log.error_v(Verbosity.MIN, "Download failed: %s", e)
             # Provide helpful troubleshooting info
-            log.error(
-                f"[DRIVER] Troubleshooting: Check network/firewall, or manually download from "
-                f"https://edgedriver.microsoft.com/download/{version}"
+            driver_log.error_v(
+                Verbosity.MED,
+                "Troubleshooting: Check network/firewall, or manually download from https://edgedriver.microsoft.com/download/%s",
+                version,
             )
             return False
 
@@ -164,43 +178,44 @@ class DriverDownloader:
         browser_ver = DriverDownloader.get_browser_version()
 
         if browser_ver == "unknown":
-            log.warning("[DRIVER] Could not detect browser version - skipping auto-update")
+            driver_log = TwoVectorLogger(log, source="DRIVER")
+            driver_log.warning_v(Verbosity.MED, "Could not detect browser version - skipping auto-update")
             return DriverDownloader.DRIVER_PATH.exists()
 
         driver_ver = DriverDownloader.get_driver_version(DriverDownloader.DRIVER_PATH)
 
-        log.info(f"[DRIVER] Browser v{browser_ver}, Driver v{driver_ver}")
+        driver_log = TwoVectorLogger(log, source="DRIVER")
+        driver_log.info_v(Verbosity.MIN, "Browser v%s, Driver v%s", browser_ver, driver_ver)
 
         # Compare major versions
         browser_major = browser_ver.split(".")[0]
         driver_major = driver_ver.split(".")[0] if driver_ver != "unknown" else "0"
 
         if browser_major == driver_major:
-            log.info(f"[DRIVER] ✅ Driver version matches browser")
+            driver_log.info_v(Verbosity.MIN, "Driver version matches browser")
             return True
 
         # Version mismatch - attempt to download correct version
-        log.warning(
-            f"[DRIVER] Version mismatch: browser={browser_ver}, driver={driver_ver}"
-        )
-        log.info(f"[DRIVER] Attempting to download driver v{browser_ver}...")
+        driver_log.warning_v(Verbosity.MED, "Version mismatch: browser=%s, driver=%s", browser_ver, driver_ver)
+        driver_log.info_v(Verbosity.MIN, "Attempting to download driver v%s...", browser_ver)
 
         if DriverDownloader.download_driver(browser_ver, DriverDownloader.DRIVER_PATH):
-            log.info(f"[DRIVER] ✅ Driver updated to v{browser_ver}")
+            driver_log.info_v(Verbosity.MIN, "Driver updated to v%s", browser_ver)
             return True
         else:
             # Download failed, but let's check if existing driver is usable
             if DriverDownloader.DRIVER_PATH.exists():
                 log.warning(
-                    f"[DRIVER] ⚠️  Download failed, but existing driver found. "
-                    f"System may work with v{driver_ver}, but best practice is to update. "
-                    f"Manual download: https://edgedriver.microsoft.com/download/{browser_ver}"
+                    "Download failed, but existing driver found. System may work with v%s, but best practice is to update. Manual download: https://edgedriver.microsoft.com/download/%s",
+                    driver_ver,
+                    browser_ver,
                 )
                 return True  # Proceed with caution
             else:
                 log.error(
-                    f"[DRIVER] ❌ Failed to download driver v{browser_ver} and no existing driver found. "
-                    f"Manual download required: https://edgedriver.microsoft.com/download/{browser_ver}"
+                    "Failed to download driver v%s and no existing driver found. Manual download required: https://edgedriver.microsoft.com/download/%s",
+                    browser_ver,
+                    browser_ver,
                 )
                 return False
 

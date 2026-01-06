@@ -70,10 +70,15 @@ There are two ways to run the project:
 *   **Logging**: The project uses the standard `logging` module. A logger named `mc.automation` is configured and used throughout the application.
 *   **Error Handling**: The code uses `try...except` blocks to handle potential Selenium exceptions (e.g., `TimeoutException`, `StaleElementReferenceException`) and logs errors gracefully. UI interaction helpers in `ui_helpers.py` often return a boolean status.
 *   **TODO Conventions**: Use `[TODO]` inline markers.
-*   **Logging Strategy**:
-    *   **Levels**: DEBUG (verbose), INFO (normal), WARN (unexpected but handled), ERROR (failures)
-    *   **Tags**: [LOGIN], [MVA], [WORKITEM], [COMPLAINT], [WARN], [ERROR]
-    *   **Format**: [TAG] {mva} - action/outcome
+*   **Logging Strategy (Two-Vector “Microscope”)**:
+  *   **Criticality (min floor)**: Only log if `level >= logging.min_crit` (INFO/WARNING/ERROR/CRITICAL).
+  *   **Verbosity (max ceiling)**: Only log if `verbosity <= logging.max_verb` (MIN/MED/FULL).
+  *   **Microscope mapping**:
+    *   MIN = Surface (“What happened?”)
+    *   MED = Structure (“How did we decide?”)
+    *   FULL = Atomic (“Why exactly?”)
+  *   **Format**: `[HH:MM:SS][CRIT_VERB][Source][Context]<Message>`
+  *   **Config reference**: `src/compass_automation/config/README.md`
 *   **Weekly Review**:
     *   ✅ Confirm branch hygiene (main vs feature)
     *   ✅ Check recent commits for scope creep

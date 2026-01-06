@@ -72,8 +72,9 @@ class TestSystemReadiness:
             "password", 
             "login_id",
             "delay_seconds",
-            "logging.level",
-            "logging.format",
+            "logging.min_crit",
+            "logging.max_verb",
+            "logging.file",
             "performance.config_threshold",
             "performance.object_creation_threshold"
         ]
@@ -90,7 +91,14 @@ class TestSystemReadiness:
                     if not isinstance(value, (int, float)) or value <= 0:
                         invalid_values.append(f"{key}: {value} (should be positive number)")
                 
-                elif key in ["username", "password", "login_id", "logging.level", "logging.format"]:
+                elif key in [
+                    "username",
+                    "password",
+                    "login_id",
+                    "logging.min_crit",
+                    "logging.max_verb",
+                    "logging.file",
+                ]:
                     if not isinstance(value, str) or not value.strip():
                         invalid_values.append(f"{key}: empty or invalid string")
                         
@@ -282,19 +290,15 @@ class TestLoggingIntegration:
         print(f"✅ Logger consistent across {len(loggers_tested)} modules: {loggers_tested}")
     
     def test_log_level_configuration(self):
-        """Test that log levels are properly configured."""
+        """Test that logging is configured per the Two-Vector design."""
         from compass_automation.utils.logger import log
-        from compass_automation.config.config_loader import get_config
         import logging
+
+        # The Two-Vector system keeps the underlying logger at DEBUG so that
+        # filtering is performed by TwoVectorFilter (min_crit + max_verb).
+        assert log.level == logging.DEBUG
         
-        # Get configured log level
-        config_level = get_config("logging.level", "INFO")
-        expected_level = getattr(logging, config_level.upper())
-        
-        # Check if logger level matches config
-        assert log.level == expected_level, f"Logger level {log.level} doesn't match config {expected_level}"
-        
-        print(f"✅ Log level correctly configured: {config_level}")
+        print("✅ Logger level is DEBUG; filtering handled by Two-Vector filter")
 
 
 class TestDataIntegration:

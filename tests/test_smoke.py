@@ -62,13 +62,40 @@ class TestQuickSmoke:
     
     def test_logger_basic_functionality(self):
         """Test that logging works without errors."""
-        from compass_automation.utils.logger import log
-        
-        # These should not raise exceptions
-        log.debug("Test debug message")
-        log.info("Test info message")
-        log.warning("Test warning message")
-        
+        import io
+        import logging
+
+        from compass_automation.utils.logger import TwoVectorFormatter, log
+
+        # Don't pollute the shared automation.log during unit/smoke tests.
+        stream = io.StringIO()
+        handler = logging.StreamHandler(stream)
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(TwoVectorFormatter())
+
+        old_handlers = list(log.handlers)
+        old_filters = list(getattr(log, "filters", []))
+        old_propagate = log.propagate
+        try:
+            log.handlers = []
+            log.filters = []
+            log.propagate = False
+            log.addHandler(handler)
+
+            # These should not raise exceptions
+            log.debug("Test debug message")
+            log.info("Test info message")
+            log.warning("Test warning message")
+        finally:
+            log.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+            log.handlers = old_handlers
+            log.filters = old_filters
+            log.propagate = old_propagate
+
         assert log.name == "mc.automation"
     
     def test_data_loader_basic_functionality(self):

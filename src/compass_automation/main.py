@@ -11,6 +11,26 @@ from compass_automation.flows.work_item_flow import handle_pm_workitems
 def main():
     log.info("Starting Compass automation...")
 
+    username = get_config("username")
+    password = get_config("password")
+    login_id = get_config("login_id")
+
+    # Fail fast if credentials are still placeholders.
+    placeholders = {"YOUR_USERNAME", "YOUR_PASSWORD", "YOUR_LOGIN_ID"}
+    if (
+        not isinstance(username, str)
+        or not isinstance(password, str)
+        or not isinstance(login_id, str)
+        or username.strip() in placeholders
+        or password.strip() in placeholders
+        or login_id.strip() in placeholders
+    ):
+        log.error(
+            "Credentials are not configured. Set real values in src/compass_automation/config/config.local.json "
+            "(preferred) or config.json, or provide env vars COMPASS_USERNAME/COMPASS_PASSWORD/COMPASS_LOGIN_ID."
+        )
+        return
+
     driver = driver_manager.get_or_create_driver()
     log.debug(f"Driver obtained: {driver}")
 
@@ -18,9 +38,9 @@ def main():
     login_page = LoginPage(driver)
     log.info("Login page loaded.")
     res = login_page.ensure_ready(
-        get_config("username"),
-        get_config("password"),
-        get_config("login_id"),
+        username,
+        password,
+        login_id,
     )
     log.info("Login page ready.")
 
